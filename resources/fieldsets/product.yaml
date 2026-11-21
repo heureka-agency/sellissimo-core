@@ -1,0 +1,6 @@
+title: Sellissimo product
+fields:
+  - import: 'sellissimo::product_content'
+  - import: 'sellissimo::product_sales'
+  - import: 'sellissimo::product_shipping'
+  - import: 'sellissimo::product_discovery'

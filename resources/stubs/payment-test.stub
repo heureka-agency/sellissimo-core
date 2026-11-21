@@ -1,0 +1,19 @@
+<?php
+
+namespace {{namespace}}\Tests;
+
+use {{namespace}}\{{class}};
+use PHPUnit\Framework\TestCase;
+
+final class {{class}}Test extends TestCase
+{
+    public function test_unconfigured_gateway_cannot_charge_an_order(): void
+    {
+        $gateway = new {{class}};
+        $order = (object) ['id' => 'example', 'total' => 100, 'currency' => 'USD'];
+        self::assertSame('pending', $gateway->outcome($order)['status']);
+        self::assertFalse($gateway->supportsRefunds());
+        $this->expectException(\LogicException::class);
+        $gateway->start($order);
+    }
+}

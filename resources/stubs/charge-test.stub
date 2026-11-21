@@ -1,0 +1,18 @@
+<?php
+
+namespace {{namespace}}\Tests;
+
+use {{namespace}}\{{class}};
+use PHPUnit\Framework\TestCase;
+
+final class {{class}}Test extends TestCase
+{
+    public function test_charge_applies_to_shipped_dollar_orders(): void
+    {
+        $provider = new {{class}};
+        $quote = ['currency' => 'USD', 'shipping' => ['label' => 'Courier']];
+        self::assertSame(250, $provider->charge($quote, 'default', null)['amount']);
+        self::assertNull($provider->charge([...$quote, 'shipping' => null], 'default', null));
+        self::assertNull($provider->charge([...$quote, 'currency' => 'EUR'], 'default', null));
+    }
+}

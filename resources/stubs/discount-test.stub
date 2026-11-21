@@ -1,0 +1,16 @@
+<?php
+
+namespace {{namespace}}\Tests;
+
+use {{namespace}}\{{class}};
+use PHPUnit\Framework\TestCase;
+
+final class {{class}}Test extends TestCase
+{
+    public function test_discount_uses_minor_currency_units(): void
+    {
+        $discount = new {{class}};
+        self::assertSame(150, $discount->amount([['subtotal' => 200]], 'USD', ['amount' => 150]));
+        self::assertSame(0, $discount->amount([], 'USD', []));
+    }
+}

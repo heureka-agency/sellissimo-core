@@ -1,0 +1,17 @@
+<?php
+
+namespace {{namespace}};
+
+use Sellissimo\Core\Contracts\OrderChargeProvider;
+
+final class {{class}} implements OrderChargeProvider
+{
+    public function charge(array $publicQuote, string $site, ?string $customer): ?array
+    {
+        if ($publicQuote['currency'] !== 'USD' || ! $publicQuote['shipping']) {
+            return null;
+        }
+
+        return ['label' => '{{name}}', 'amount' => 250, 'tax_class' => 'standard'];
+    }
+}

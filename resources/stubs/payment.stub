@@ -1,0 +1,30 @@
+<?php
+
+namespace {{namespace}};
+
+use Sellissimo\Core\Contracts\{{contract}} as Contract;
+
+final class {{class}} implements Contract
+{
+    public function start(object $order): array
+    {
+        // Use the order ID as the provider's idempotency key.
+        throw new \LogicException('Configure the payment integration before enabling this gateway.');
+    }
+
+    public function outcome(object $order): array
+    {
+        // Verify the provider's amount, currency and reference before returning paid.
+        return ['status' => 'pending'];
+    }
+
+    public function supportsRefunds(): bool
+    {
+        return false;
+    }
+
+    public function refund(object $order, object $refund): string
+    {
+        return 'failed';
+    }
+}

@@ -1,0 +1,7 @@
+title: Order fields
+tabs:
+  main:
+    display: Details
+    sections:
+      -
+        fields: []

@@ -1,0 +1,14 @@
+<?php
+
+namespace {{namespace}};
+
+use Illuminate\Support\ServiceProvider as LaravelServiceProvider;
+use Sellissimo\Core\Registry;
+
+final class ServiceProvider extends LaravelServiceProvider
+{
+    public function boot(Registry $registry): void
+    {
+        $registry->{{method}}('{{handle}}', $this->app->make({{class}}::class));
+    }
+}

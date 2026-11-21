@@ -1,0 +1,23 @@
+<?php
+
+namespace {{namespace}};
+
+use Sellissimo\Core\Contracts\ConfiguresDiscountRule as Contract;
+
+final class {{class}} implements Contract
+{
+    public function label(): string
+    {
+        return '{{name}}';
+    }
+
+    public function fields(): array
+    {
+        return ['amount' => ['type' => 'integer', 'label' => 'Discount in minor currency units', 'min' => 1, 'required' => true]];
+    }
+
+    public function amount(array $lines, string $currency, array $settings): int
+    {
+        return min(array_sum(array_column($lines, 'subtotal')), (int) ($settings['amount'] ?? 0));
+    }
+}

@@ -1,0 +1,10 @@
+title: Merchandising and search
+fields:
+  - handle: sellissimo_featured
+    field: { type: toggle, display: Featured product, instructions: 'Show this product first in the included shop.' }
+  - handle: sellissimo_related
+    field: { type: sellissimo_related, display: Related products, mode: select, max_items: 12, create: false, localizable: true }
+  - handle: sellissimo_seo_title
+    field: { type: text, display: Search title, character_limit: 70, localizable: true }
+  - handle: sellissimo_seo_description
+    field: { type: textarea, display: Search description, character_limit: 160, rows: 2, localizable: true }

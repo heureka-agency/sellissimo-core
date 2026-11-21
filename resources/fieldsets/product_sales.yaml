@@ -1,0 +1,152 @@
+title: Prices and variants
+fields:
+  - handle: sellissimo_sku
+    field:
+      type: sellissimo_sku
+      display: SKU
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+      instructions: For a simple product. Use variant rows for a product with options.
+  - handle: sellissimo_prices
+    field:
+      type: sellissimo_prices
+      display: Prices
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+      instructions: Enter a selling price for each currency. Leave a price empty to omit that currency.
+      localizable: true
+  - handle: sellissimo_sale_prices
+    field:
+      type: sellissimo_prices
+      display: Sale prices
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+  - handle: sellissimo_costs
+    field:
+      type: sellissimo_prices
+      internal: true
+      display: Cost per item (internal)
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+  - handle: sellissimo_barcode
+    field:
+      type: text
+      display: Barcode or GTIN
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+  - handle: sellissimo_mpn
+    field:
+      type: text
+      display: Manufacturer part number
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+  - handle: sellissimo_sale_starts
+    field: { type: date, display: Sale starts, width: 50, mode: single, instructions: 'Optional first day at the sale price.' }
+  - handle: sellissimo_sale_ends
+    field: { type: date, display: Sale ends, width: 50, mode: single, instructions: 'Optional last day at the sale price.' }
+  - handle: sellissimo_unit_quantity
+    field: { type: float, display: Units per pack, width: 50, validate: ['nullable', 'numeric', 'gt:0'], instructions: 'For example, enter 0.75 for a 750 ml bottle priced per litre.' }
+  - handle: sellissimo_unit
+    field: { type: select, display: Unit for price comparison, options: { kg: Kilogram, l: Litre, m: Metre, item: Item }, clearable: true, width: 50 }
+  - handle: sellissimo_tax_class
+    field:
+      type: sellissimo_reference
+      source: tax_class
+      placeholder: Choose a tax class
+      display: Tax class
+      width: 50
+      instructions: Manage rates in Store → Settings → Taxes and pricing.
+      default: standard
+  - handle: sellissimo_download
+    field:
+      type: sellissimo_reference
+      source: download
+      placeholder: Choose a private file
+      display: Private download
+      width: 50
+      if: { sellissimo_variants: empty }
+      always_save: true
+      instructions: Select private files for digital delivery. Buyers receive multiple files together as a ZIP.
+  - handle: sellissimo_download_limit
+    field: { type: integer, display: Download limit per purchased line, instructions: Leave empty to use the store default. Enter 0 for unlimited downloads., min: 0, validate: [nullable, integer, "min:0"], if: { sellissimo_variants: empty } }
+  - handle: sellissimo_download_days
+    field: { type: integer, display: Download access in days, instructions: Leave empty to use the store default. Enter 0 for unlimited access., min: 0, validate: [nullable, integer, "between:0,3650"], if: { sellissimo_variants: empty } }
+  - handle: sellissimo_variants
+    field:
+      type: sellissimo_variants
+      display: Variants
+      mode: stacked
+      add_row: Add variant
+      instructions: Each variant has its own SKU, prices and delivery type. Variant rows replace the simple product SKU and prices.
+      localizable: true
+      fields:
+        - handle: sku
+          field: { type: sellissimo_sku, display: SKU, width: 50, validate: required }
+        - handle: label
+          field: { type: text, display: Variant name, width: 50, validate: required }
+        - handle: prices
+          field: { type: sellissimo_prices, display: Prices }
+        - handle: download
+          field: { type: sellissimo_reference, source: download, display: Private download, placeholder: Choose a private file }
+        - handle: download_limit
+          field: { type: integer, display: Download limit per purchased line, instructions: Leave empty to use the store default. Enter 0 for unlimited downloads., min: 0, validate: [nullable, integer, "min:0"] }
+        - handle: download_days
+          field: { type: integer, display: Download access in days, instructions: Leave empty to use the store default. Enter 0 for unlimited access., min: 0, validate: [nullable, integer, "between:0,3650"] }
+        - handle: sale_prices
+          field: { type: sellissimo_prices, display: Sale prices, width: 50 }
+        - handle: costs
+          field: { type: sellissimo_prices, display: Cost per item (internal), internal: true, width: 50 }
+        - handle: barcode
+          field: { type: text, display: Barcode or GTIN, width: 50 }
+        - handle: mpn
+          field: { type: text, display: Manufacturer part number, width: 50 }
+        - handle: attributes
+          field: { type: array, display: Variant attributes, key_header: Attribute, value_header: Value, instructions: 'For example, Color = Sand and Size = Large.' }
+        - handle: image
+          field: { type: assets, container: sellissimo_products, display: Variant image, max_files: 1, validate: ['mimes:jpg,jpeg,png,webp,gif,avif'] }
+        - handle: weight_kg
+          field: { type: float, display: Packaged weight (kg), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+        - handle: length_cm
+          field: { type: float, display: Length (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+        - handle: width_cm
+          field: { type: float, display: Width (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+        - handle: height_cm
+          field: { type: float, display: Height (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+  - handle: sellissimo_final_sale
+    field:
+      type: toggle
+      display: Final sale
+      instructions: Exclude this physical product from customer return requests on new orders.
+      default: false
+  - handle: sellissimo_prerequisite
+    field:
+      type: sellissimo_related
+      display: Required previous purchase
+      instructions: Customers must own this product before buying this item.
+      max_items: 1
+      mode: select
+      create: false
+      localizable: true
+  - handle: sellissimo_options
+    field:
+      type: grid
+      display: Personalization
+      mode: stacked
+      add_row: Add buyer field
+      instructions: Collect text from the buyer for each item.
+      max_rows: 12
+      fields:
+        - handle: label
+          field: { type: text, display: Buyer-facing label, width: 50, validate: required }
+        - handle: handle
+          field: { type: text, display: Field identifier, width: 50, placeholder: Generated from label, validate: ['nullable', 'regex:/^[a-z][a-z0-9_]{0,39}$/'] }
+        - handle: required
+          field: { type: toggle, display: Required at checkout, width: 50 }
+        - handle: max_length
+          field: { type: integer, display: Maximum characters, width: 50, default: 100, validate: ['required', 'integer', 'between:1,250'] }

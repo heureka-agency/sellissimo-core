@@ -1,0 +1,24 @@
+title: Shipping and customs
+fields:
+  - handle: sellissimo_track_stock
+    field:
+      type: toggle
+      display: Track inventory
+      default: true
+      instructions: Turn off for made-to-order goods that ship without a stock limit.
+  - handle: sellissimo_gift_voucher
+    field: { type: toggle, display: Gift voucher, instructions: 'Email a voucher for the regular SKU price after payment. Enable gift vouchers for the site to list this product.' }
+  - handle: sellissimo_service
+    field: { type: toggle, display: Virtual product or service, instructions: 'Requires neither shipping nor stock. A private file can be delivered when configured.' }
+  - handle: sellissimo_weight_kg
+    field: { type: float, display: Packaged weight (kg), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+  - handle: sellissimo_length_cm
+    field: { type: float, display: Length (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+  - handle: sellissimo_width_cm
+    field: { type: float, display: Width (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+  - handle: sellissimo_height_cm
+    field: { type: float, display: Height (cm), width: 50, validate: ['nullable', 'numeric', 'min:0'] }
+  - handle: sellissimo_origin
+    field: { type: sellissimo_reference, source: country, display: Country of origin, placeholder: Choose a country, width: 50 }
+  - handle: sellissimo_hs_code
+    field: { type: text, display: Harmonized System code, width: 50, validate: ['nullable', 'regex:/^[0-9]{6,12}$/'] }

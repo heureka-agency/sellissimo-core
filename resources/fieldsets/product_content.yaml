@@ -1,0 +1,25 @@
+title: Product presentation
+fields:
+  - handle: sellissimo_summary
+    field: { type: textarea, display: Short description, rows: 2, localizable: true, character_limit: 320, validate: ['nullable', 'string', 'max:320'] }
+  - handle: sellissimo_description
+    field: { type: markdown, display: Description, localizable: true }
+  - handle: sellissimo_gallery
+    field: { type: assets, display: Product images, container: sellissimo_products, mode: grid, max_files: 16, restrict: true, validate: ['mimes:jpg,jpeg,png,webp,gif,avif'], instructions: 'The first image is the cover. Set alternative text on each asset.' }
+  - handle: sellissimo_brand
+    field: { type: text, display: Brand or manufacturer, width: 50 }
+  - handle: sellissimo_product_type
+    field: { type: text, display: Product type, width: 50, localizable: true }
+  - handle: sellissimo_categories
+    field: { type: terms, display: Categories, taxonomies: [sellissimo_categories], mode: select, width: 50 }
+  - handle: sellissimo_tags
+    field: { type: terms, display: Tags, taxonomies: [sellissimo_tags], mode: select, width: 50 }
+  - handle: sellissimo_specs
+    field:
+      type: grid
+      display: Specifications
+      add_row: Add specification
+      localizable: true
+      fields:
+        - { handle: name, field: { type: text, display: Name, validate: required } }
+        - { handle: value, field: { type: text, display: Value, validate: required } }

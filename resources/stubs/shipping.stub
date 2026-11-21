@@ -1,0 +1,16 @@
+<?php
+
+namespace {{namespace}};
+
+use Sellissimo\Core\Contracts\{{contract}} as Contract;
+
+final class {{class}} implements Contract
+{
+    public function quotes(array $physicalLines, array $address, string $currency): array
+    {
+        // Replace the sample pickup option with your supported destinations and rates.
+        return $physicalLines && !empty($address['country'])
+            ? ['pickup' => ['label' => '{{name}}', 'amount' => 0]]
+            : [];
+    }
+}

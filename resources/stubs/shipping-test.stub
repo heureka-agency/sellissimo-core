@@ -1,0 +1,21 @@
+<?php
+
+namespace {{namespace}}\Tests;
+
+use {{namespace}}\{{class}};
+use PHPUnit\Framework\TestCase;
+
+final class {{class}}Test extends TestCase
+{
+    use \Sellissimo\Core\Testing\ShippingProviderContract;
+
+    protected function shippingProvider(): {{class}}
+    {
+        return new {{class}};
+    }
+
+    protected function quoteFixture(): array
+    {
+        return [[['sku' => 'EXAMPLE', 'qty' => 1]], ['country' => 'US'], 'USD'];
+    }
+}
