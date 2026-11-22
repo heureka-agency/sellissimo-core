@@ -23,7 +23,7 @@
             <dialog class="ss-gallery-dialog" data-gallery-dialog aria-label="{{ __('sellissimo::shop.product_image_viewer') }}">
                 <div class="ss-gallery-tools">
                     @if(count($images) > 1)
-                        <span data-gallery-count role="status"></span>
+                        <output data-gallery-count aria-live="polite"></output>
                         <button type="button" data-gallery-previous aria-label="{{ __('sellissimo::shop.previous_product_image') }}">&#8592;</button>
                         <button type="button" data-gallery-next aria-label="{{ __('sellissimo::shop.next_product_image') }}">&#8594;</button>
                     @endif
