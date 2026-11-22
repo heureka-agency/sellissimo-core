@@ -10,6 +10,7 @@ return [
     'storefront' => env('SELLISSIMO_STOREFRONT', false),
     'prefix' => env('SELLISSIMO_PREFIX', 'shop'),
     'activity_widget' => true,
+    'default_features' => [],
     'low_stock_threshold' => 5,
     'order_columns_by_role' => [], // Role handle => comma-separated order columns.
     'carriers' => [],
@@ -21,6 +22,7 @@ return [
     'order_charge_providers' => [],
     'discount_rules' => [],
     'discounts' => [],
+    'checkout_policy' => [],
     'taxes' => [],
     'tax_settings' => [], // Per site: physical_address (billing or shipping), shipping_class, provider.
     'download_disk' => 'sellissimo_private',

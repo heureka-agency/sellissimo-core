@@ -8,6 +8,7 @@ use Illuminate\Validation\ValidationException;
 use Sellissimo\Core\Http\StoreCountries;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Entry;
+use Statamic\Facades\Taxonomy;
 use Statamic\Statamic;
 
 final class OperationalSettings
@@ -22,6 +23,7 @@ final class OperationalSettings
                     'instructions' => 'Choose the collections that supply products. Their entry blueprints need Sellissimo SKU and price fields.',
                 ], true),
                 'product_url' => self::urlField('Custom product URL pattern', config('sellissimo.product_urls.'.$site), 'For a custom storefront, enter a site path or full URL containing {sku}. Leave empty to link to the product entry.'),
+                'cross_sell_category_pairs' => self::categoryPairs($site),
                 'low_stock_threshold' => self::number('Low-stock threshold', config('sellissimo.low_stock_threshold', 5), 0, 999999999, 'Notify staff when stock falls to this quantity. Set recipients in Emails and notifications.', true),
             ],
             'checkout' => self::checkoutFields($site) + self::providerFields($section, $site),
@@ -42,12 +44,28 @@ final class OperationalSettings
         };
     }
 
+    private static function categoryPairs(string $site): array
+    {
+        $options = [];
+        foreach (Taxonomy::findByHandle('sellissimo_categories')?->queryTerms()->get() ?? [] as $term) {
+            $options[$term->slug()] = $term->in($site)?->title() ?: $term->slug();
+        }
+
+        return self::field('Complementary category pairs', 'grid', config("sellissimo.cross_sell_category_pairs.$site", []), 'array|max:100', [
+            'mode' => 'table', 'max_rows' => 100, 'add_row' => __('Add pair'), 'fields' => [
+                ['handle' => 'source', 'field' => ['type' => 'select', 'display' => __('Product category'), 'options' => $options, 'searchable' => true]],
+                ['handle' => 'target', 'field' => ['type' => 'select', 'display' => __('Complementary category'), 'options' => $options, 'searchable' => true]],
+            ],
+        ]);
+    }
+
     private static function firstOrderNumber(): array
     {
         $store = app(Store::class);
         $issued = $store->hasTable('orders') && ($store->table('orders')->exists() || ($store->hasTable('order_sequences')
             && $store->table('order_sequences')->where('name', 'orders')->value('last_number') > 0));
         $help = $issued ? 'Orders have already been issued. The order number sequence is fixed.' : 'Set this before issuing your first order. All sites share the same sequence.';
+
         // Keep long order numbers as text in the browser so JavaScript preserves every digit.
         return self::field('First order number', 'text', (string) config('sellissimo.first_order_number', 1000),
             'required|regex:/^[1-9][0-9]{0,17}$/D', ['input_mode' => 'numeric', 'instructions' => __($help)], true) + ['readonly' => $issued];
@@ -64,6 +82,7 @@ final class OperationalSettings
             'instructions' => $instructions, 'add_row' => __('Add option'), 'fields' => [
                 ['handle' => 'choice', 'field' => ['type' => 'select', 'display' => __('Option'), 'options' => $options, 'searchable' => true]],
             ]];
+
         return self::field($label, 'grid', $default, 'array|min:'.$minimum.'|max:100', $config, $shared) + ['ordered' => true];
     }
 
@@ -97,8 +116,13 @@ final class OperationalSettings
             $fields['default_'.$purpose.'_country'] = self::field('Default '.strtolower($label).' country', 'select', $inherited['default_'.$purpose] ?? null, 'nullable|string|size:2', ['options' => $countries, 'clearable' => true, 'searchable' => true]);
         }
         foreach (['terms_page' => 'Terms and conditions page', 'privacy_page' => 'Privacy policy page'] as $key => $label) {
-            $fields[$key] = self::field($label, 'entries', null, 'nullable|string|max:255', ['max_items' => 1, 'mode' => 'select', 'instructions' => __('Select a published page for this site. Buyers see a link before placing an order.')]);
+            $fields[$key] = self::field($label, 'entries', config("sellissimo.checkout_policy.$site.$key"), 'nullable|string|max:255', ['max_items' => 1, 'mode' => 'select', 'instructions' => __('Select a published page for this site. Buyers see a link before placing an order.')]);
         }
+        foreach (['require_terms' => 'Require acceptance of terms', 'require_privacy' => 'Require acknowledgement of the privacy notice', 'offer_newsletter' => 'Offer newsletter subscription', 'payment_obligation' => 'Use explicit payment obligation button'] as $key => $label) {
+            $fields[$key] = self::field($label, 'toggle', (bool) config("sellissimo.checkout_policy.$site.$key", false), 'boolean');
+        }
+        $fields['payment_notice'] = self::field('Additional payment notice', 'text', config("sellissimo.checkout_policy.$site.payment_notice"), 'nullable|string|max:500');
+
         return $fields;
     }
 
@@ -133,7 +157,7 @@ final class OperationalSettings
             $scope = $single ? $site : StoreSettings::GLOBAL;
             $current = StoreSettings::forSection($scope, $section, $key, $default);
             $missing = array_diff(array_unique([...(array) $current, ...(array) $default]), array_keys($options), ['@core']);
-            if (!$options && !$missing) {
+            if (! $options && ! $missing) {
                 continue;
             }
             foreach ($missing as $handle) {
@@ -150,16 +174,17 @@ final class OperationalSettings
             $definition = $ordered
                 ? self::orderedField($label, $options, $default, $instructions, true)
                 : self::field($label, 'select', $default, $single ? 'required|string|max:100' : 'array|max:100',
-                    ['options' => $options, 'multiple' => !$single, 'searchable' => true, 'instructions' => $instructions], !$single);
+                    ['options' => $options, 'multiple' => ! $single, 'searchable' => true, 'instructions' => $instructions], ! $single);
             $fields[$key] = $definition + ['permission' => $permission];
         }
+
         return $fields;
     }
 
     public static function validateChanges(string $section, string $site, array $changes): void
     {
         foreach (self::PROVIDERS as $key => [$group, $kind]) {
-            if ($section !== $group || !isset($changes[$key])) {
+            if ($section !== $group || ! isset($changes[$key])) {
                 continue;
             }
             $allowed = array_keys(app(Registry::class)->installed($kind));
@@ -170,6 +195,12 @@ final class OperationalSettings
         }
         if ($section === 'catalog' && isset($changes['product_collections'])) {
             self::allowedValues('product_collections', $changes['product_collections'], Collection::all()->map->handle()->all());
+        }
+        if ($section === 'catalog' && isset($changes['cross_sell_category_pairs'])) {
+            $options = array_keys(self::categoryPairs($site)['field']['fields'][0]['field']['options']);
+            foreach ($changes['cross_sell_category_pairs'] as $row) {
+                self::allowedValues('cross_sell_category_pairs', [$row['source'] ?? '', $row['target'] ?? ''], $options);
+            }
         }
         if ($section === 'orders' && array_key_exists('first_order_number', $changes)) {
             $store = app(Store::class);
@@ -187,7 +218,7 @@ final class OperationalSettings
                     $url = str_replace('{sku}', 'SKU-123', $url);
                 }
                 $relative = preg_match('~^/(?!/)[^\\\\\x00-\x20]*$~D', $url);
-                if (!$relative && (str_contains($url, '\\') || !filter_var($url, FILTER_VALIDATE_URL) || !in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'], true) || parse_url($url, PHP_URL_USER) !== null)) {
+                if (! $relative && (str_contains($url, '\\') || ! filter_var($url, FILTER_VALIDATE_URL) || ! in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'], true) || parse_url($url, PHP_URL_USER) !== null)) {
                     self::invalid($key, 'Use a site path beginning with / or a full HTTP or HTTPS URL.');
                 }
             }
@@ -195,24 +226,29 @@ final class OperationalSettings
         if ($section !== 'checkout') {
             return;
         }
-        if (isset($changes['guest_checkout']) && !$changes['guest_checkout'] && !Statamic::pro()) {
+        if (isset($changes['guest_checkout']) && ! $changes['guest_checkout'] && ! Statamic::pro()) {
             self::invalid('guest_checkout', 'Requiring customer accounts needs Statamic Pro.');
         }
-        if (!empty($changes['storefront'])) {
+        if (! empty($changes['storefront'])) {
             $problem = self::storefrontConflict($site);
             if ($problem) {
                 self::invalid('storefront', $problem);
             }
         }
-        foreach (['terms_page', 'privacy_page'] as $key) {
-            if (!empty($changes[$key]) && !self::pageUrl($changes[$key], $site)) {
+        foreach (['terms_page' => 'require_terms', 'privacy_page' => 'require_privacy'] as $key => $toggle) {
+            if (! array_key_exists($key, $changes) && ! array_key_exists($toggle, $changes)) {
+                continue;
+            }
+            $page = array_key_exists($key, $changes) ? $changes[$key] : CheckoutPolicy::setting($site, $key);
+            $required = $changes[$toggle] ?? CheckoutPolicy::setting($site, $toggle, false);
+            if (($required || $page) && (! $page || ! self::pageUrl($page, $site))) {
                 self::invalid($key, 'Choose a published page with a public URL on this site.');
             }
         }
         if (isset($changes['checkout_steps'])) {
             $order = $changes['checkout_steps'];
             self::allowedValues('checkout_steps', $order, ['contact', 'delivery', 'review', ...array_keys(app(Registry::class)->installed('checkout_steps'))]);
-            if (reset($order) !== 'contact' || end($order) !== 'review' || !in_array('delivery', $order, true)) {
+            if (reset($order) !== 'contact' || end($order) !== 'review' || ! in_array('delivery', $order, true)) {
                 self::invalid('checkout_steps', 'Start with contact, include delivery and finish with review.');
             }
         }
@@ -221,7 +257,7 @@ final class OperationalSettings
         foreach (['billing', 'shipping'] as $purpose) {
             $listKey = $purpose.'_countries';
             $defaultKey = 'default_'.$purpose.'_country';
-            if (!array_key_exists($listKey, $changes) && !array_key_exists($defaultKey, $changes)) {
+            if (! array_key_exists($listKey, $changes) && ! array_key_exists($defaultKey, $changes)) {
                 continue;
             }
             if (isset($changes[$listKey])) {
@@ -229,7 +265,7 @@ final class OperationalSettings
             }
             $list = array_key_exists($listKey, $changes) ? ($changes[$listKey] ?? $inherited[$purpose] ?? []) : StoreSettings::forSection($site, 'checkout', $listKey, $inherited[$purpose] ?? []);
             $default = array_key_exists($defaultKey, $changes) ? ($changes[$defaultKey] ?? $inherited['default_'.$purpose] ?? null) : StoreSettings::forSection($site, 'checkout', $defaultKey, $inherited['default_'.$purpose] ?? null);
-            if ($default && (!isset($codes[$default]) || ($list && !in_array($default, $list, true)))) {
+            if ($default && (! isset($codes[$default]) || ($list && ! in_array($default, $list, true)))) {
                 self::invalid($defaultKey, 'Choose an allowed country as the default.');
             }
         }
@@ -237,7 +273,7 @@ final class OperationalSettings
 
     private static function allowedValues(string $key, array $values, array $allowed): void
     {
-        if (!array_is_list($values) || collect($values)->contains(fn ($value) => !is_string($value) || !in_array($value, $allowed, true)) || count(array_unique($values)) !== count($values)) {
+        if (! array_is_list($values) || collect($values)->contains(fn ($value) => ! is_string($value) || ! in_array($value, $allowed, true)) || count(array_unique($values)) !== count($values)) {
             self::invalid($key, 'Choose each item once from the available options.');
         }
     }
@@ -252,17 +288,19 @@ final class OperationalSettings
         $issues = [];
         foreach (Catalog::collections() as $handle) {
             $collection = Collection::findByHandle($handle);
-            if (!$collection || !$collection->sites()->contains($site)) {
+            if (! $collection || ! $collection->sites()->contains($site)) {
                 $issues[] = ['message' => __('Collection :name is unavailable on this site.', ['name' => $handle]), 'url' => null];
+
                 continue;
             }
             foreach ($collection->entryBlueprints() as $blueprint) {
                 $fields = $blueprint->fields()->all();
-                if (!$fields->has('sellissimo_variants') && !($fields->has('sellissimo_prices') && $fields->has('sellissimo_sku'))) {
+                if (! $fields->has('sellissimo_variants') && ! ($fields->has('sellissimo_prices') && $fields->has('sellissimo_sku'))) {
                     $issues[] = ['message' => __('Add product SKU and price fields to :blueprint.', ['blueprint' => $blueprint->title()]), 'url' => request()->user()?->can('configure fields') ? cp_route('blueprints.collections.edit', [$collection, $blueprint]) : null];
                 }
             }
         }
+
         return $issues;
     }
 
@@ -273,12 +311,12 @@ final class OperationalSettings
 
     public static function storefrontConflict(string $site): ?string
     {
-        if (!Route::has('sellissimo.shop')) {
+        if (! Route::has('sellissimo.shop')) {
             return __('The configured storefront path is unavailable. Check the path and rebuild the application route cache.');
         }
         $prefix = trim(config('sellissimo.prefix'), '/');
         foreach (Route::getRoutes() as $route) {
-            if (!str_starts_with($route->getName() ?? '', 'sellissimo.') && ($route->uri() === $prefix || str_starts_with($route->uri(), $prefix.'/'))) {
+            if (! str_starts_with($route->getName() ?? '', 'sellissimo.') && ($route->uri() === $prefix || str_starts_with($route->uri(), $prefix.'/'))) {
                 return __('Another application route already uses /:path. Choose a different storefront path in the hosting configuration.', ['path' => $route->uri()]);
             }
         }
@@ -292,6 +330,7 @@ final class OperationalSettings
                 return __('A page already uses /:path. Choose a different storefront path in the hosting configuration.', ['path' => $uri]);
             }
         }
+
         return null;
     }
 
@@ -301,6 +340,7 @@ final class OperationalSettings
         foreach (['login', 'register'] as $kind) {
             $accounts[$kind] = StoreSettings::forSection($site, 'checkout', 'account_'.$kind.'_url', $accounts[$kind] ?? null);
         }
+
         return $accounts;
     }
 
@@ -308,18 +348,20 @@ final class OperationalSettings
     {
         $links = [];
         foreach (['terms_page', 'privacy_page'] as $name) {
-            if ($id = StoreSettings::forSection($site, 'checkout', $name)) {
+            if ($id = CheckoutPolicy::setting($site, $name)) {
                 if ($url = self::pageUrl($id, $site)) {
                     $links[$name] = $url;
                 }
             }
         }
+
         return $links;
     }
 
     private static function pageUrl(string $id, string $site): ?string
     {
         $entry = Entry::find($id)?->in($site);
+
         return $entry?->status() === 'published' ? $entry->absoluteUrl() : null;
     }
 
@@ -330,12 +372,14 @@ final class OperationalSettings
             'first_order_number' => 'orders',
             'recovery_automatic', 'recovery_inactive_minutes', 'recovery_retention_days' => 'emails',
         };
+
         return StoreSettings::forSection(StoreSettings::GLOBAL, $section, $key, config('sellissimo.'.$config, $fallback));
     }
 
     public static function accessDays(object $order): int
     {
         $receipt = json_decode($order->receipt ?? '{}', true);
+
         return (int) ($receipt['access_days'] ?? config('sellissimo.access_days', 7));
     }
 }

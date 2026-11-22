@@ -11,7 +11,7 @@ class Pricing
     public function calculate(object $cart, array $input, bool $checkout = false, bool $placingOrder = false, ?object $amendment = null, bool $cartPreview = false, bool $settingsPreview = false): array
     {
         if ($settingsPreview) {
-            throw_unless($cartPreview && !$checkout && !$placingOrder && empty($cart->id), \LogicException::class, 'A settings preview requires a temporary cart.');
+            throw_unless($cartPreview && ! $checkout && ! $placingOrder && empty($cart->id), \LogicException::class, 'A settings preview requires a temporary cart.');
         } else {
             app(StockHolds::class)->expireDue();
         }
@@ -19,7 +19,7 @@ class Pricing
         $scope = CommerceFields::scope($cart);
         $orderValues = $commerceFields->values('order', $input['order_fields'] ?? json_decode($cart->order_fields ?? '{}', true), $scope, true, $checkout);
         $currency = $cart->currency;
-        abort_if(!$settingsPreview && empty($cart->retry_order_id) && $this->catalog->currency($cart->site) !== $currency, 409, __('The selling currency changed. Review the cart to rebuild it.'));
+        abort_if(! $settingsPreview && empty($cart->retry_order_id) && $this->catalog->currency($cart->site) !== $currency, 409, __('The selling currency changed. Review the cart to rebuild it.'));
         $retry = PaymentRetry::originalReceipt($cart);
         [$lines, $unavailable, $products, $quantities, $subtotal] = $this->prepareLines(
             $cart, $commerceFields, $scope, $retry, $amendment, $checkout || $cartPreview, $cartPreview
@@ -51,9 +51,9 @@ class Pricing
         $provider = isset($settings['provider']) ? $this->providers->registered('tax_providers', $settings['provider']) : null;
         $fields = fn ($location, $classes) => $provider ? $provider->requiredFields($location, $classes, $cart->site) : $this->rules->billingFields($location, $classes);
         $ratesFor = fn ($location) => $provider ? $provider->rates($location, $cart->site) : $this->rules->taxRates($location);
-        $physical = array_values(array_filter($lines, fn ($item) => !$item['digital']));
+        $physical = array_values(array_filter($lines, fn ($item) => ! $item['digital']));
         $countryErrors = app(CheckoutCountries::class)->errors($cart->site, $address, $input['shipping_address'] ?? null, (bool) $physical);
-        if ($countryErrors && !$cartPreview) {
+        if ($countryErrors && ! $cartPreview) {
             throw ValidationException::withMessages($countryErrors);
         }
         $physicalClasses = array_values(array_unique(array_column($physical, 'tax_class')));
@@ -79,11 +79,11 @@ class Pricing
             abort(422, __('sellissimo::shop.enter_'.$label.'_fields_to_calculate_tax', ['fields' => implode(' '.__('sellissimo::shop.and').' ', $fields)]));
         }
         if ($checkout && ! $placingOrder && $shortages) {
-            abort(409, __('sellissimo::shop.insufficient_stock_for_sku', ['sku'=>implode(', ', array_keys($shortages))]));
+            abort(409, __('sellissimo::shop.insufficient_stock_for_sku', ['sku' => implode(', ', array_keys($shortages))]));
         }
         $code = strtoupper($input['discount'] ?? '');
         $eligibleLines = array_filter($lines, fn ($line) => empty($line['voucher_product']));
-        abort_if($lines && !$eligibleLines && $code !== '', 422, __('sellissimo::shop.the_cart_contains_no_items_eligible_for_this_discount'));
+        abort_if($lines && ! $eligibleLines && $code !== '', 422, __('sellissimo::shop.the_cart_contains_no_items_eligible_for_this_discount'));
         $offers = $eligibleLines || $code !== '' ? $this->rules->offers($code, $currency, $eligibleLines, $input['email'] ?? null, $cart->customer ?? null, $placingOrder, $amendment?->id, $cart->site) : [];
         $discount = array_sum(array_column($offers, 'discount'));
         $freeShipping = in_array(true, array_column($offers, 'free_shipping'), true);
@@ -109,7 +109,7 @@ class Pricing
         unset($line);
         $physical = array_values(array_filter($lines, fn ($item) => ! $item['digital']));
         $options = [];
-        if ($physical && !$countryErrors && ! empty($destination['country'])) {
+        if ($physical && ! $countryErrors && ! empty($destination['country'])) {
             foreach ($this->providers->enabled('shipping') as $handle => $provider) {
                 foreach ($provider->quotes($physical, $destination, $currency) as $key => $quote) {
                     throw_unless(is_int($quote['amount']) && $quote['amount'] >= 0 && is_string($quote['label']), 'Invalid shipping quote.');
@@ -121,7 +121,7 @@ class Pricing
                 }
             }
         }
-        if ($physical && !empty($destination['country']) && isset($input['custom_shipping'])) {
+        if ($physical && ! empty($destination['country']) && isset($input['custom_shipping'])) {
             $fixed = $input['custom_shipping'];
             if ($freeShipping) {
                 $fixed['original_amount'] = $fixed['amount'];
@@ -133,7 +133,7 @@ class Pricing
             foreach ($options as &$option) {
                 $inclusive = in_array($shippingClass, $inclusiveClasses, true);
                 $option['tax'] = PricingRules::roundedRate($option['amount'], $physicalRates[$shippingClass] ?? 0, $inclusive);
-                if (!$inclusive) {
+                if (! $inclusive) {
                     $option['amount'] += $option['tax'];
                 }
             }
@@ -148,8 +148,8 @@ class Pricing
         }
         abort_if($checkout && ! $lines, 422, __('sellissimo::shop.cart_is_empty'));
         $completeAddress = collect(DeliveryFields::required($destination))->every(fn ($field) => filled($destination[$field] ?? null));
-        $deliveryReady = !$physical || ($shipping && $completeAddress);
-        abort_if(!$deliveryReady && $checkout, 422, __('sellissimo::shop.choose_delivery_and_supply_a_complete_address'));
+        $deliveryReady = ! $physical || ($shipping && $completeAddress);
+        abort_if(! $deliveryReady && $checkout, 422, __('sellissimo::shop.choose_delivery_and_supply_a_complete_address'));
 
         $receipt = [
             ...($countryErrors ? ['country_errors' => $countryErrors] : []),
@@ -182,7 +182,7 @@ class Pricing
                 }
             }
         }
-        if (!empty($input['voucher']) && !$amendment) {
+        if (! empty($input['voucher']) && ! $amendment) {
             $receipt['voucher'] = app(GiftVouchers::class)->quote($receipt, $input['voucher'], $cart->site, $placingOrder);
             $receipt['amount_due'] = $receipt['total'] - $receipt['voucher']['amount'];
         }
@@ -200,6 +200,7 @@ class Pricing
                 && (int) ($receipt['amount_due'] ?? $receipt['total']) === (int) ($retry['amount_due'] ?? $retry['total']);
             abort_unless($sameAmounts, 409, __('The original payment amount can no longer be reproduced. Start a new order to review current prices.'));
         }
+
         return $receipt;
     }
 
@@ -232,8 +233,9 @@ class Pricing
             foreach ($retry['lines'] as $line) {
                 $sku = $line['sku'];
                 $product = $products[$sku] ?? $current[$sku] ?? null;
-                if (!$product || $product['entry_id'] !== ($line['entry_id'] ?? null)) {
+                if (! $product || $product['entry_id'] !== ($line['entry_id'] ?? null)) {
                     unset($products[$sku]);
+
                     continue;
                 }
                 $products[$sku] = [...$product, 'currency' => $cart->currency, 'price' => $line['price'], 'compare_at_price' => null];
@@ -260,13 +262,14 @@ class Pricing
                 $line = $this->priceLine($cart, $stored, $sku, $key, $qty, $products[$sku] ?? null, $originalLines->get($key),
                     $returnDays, $commerceFields, $scope, $validateFields, $priceProviders, $priceContext);
             } catch (ValidationException $error) {
-                if (!$skipUnavailable) {
+                if (! $skipUnavailable) {
                     throw $error;
                 }
                 $unavailable[] = ['key' => $key, 'sku' => $sku, 'title' => $titles[$key] ?? $products[$sku]['title'] ?? $sku];
+
                 continue;
             }
-            if ($skipUnavailable && !empty($products[$sku]['option_fields'])) {
+            if ($skipUnavailable && ! empty($products[$sku]['option_fields'])) {
                 $line['can_edit_options'] = true;
             }
             $lines[] = $line;
@@ -288,9 +291,9 @@ class Pricing
                 'currency' => $currency, 'digital' => true, 'downloadable' => false, 'file' => null, 'tax_class' => 'standard',
                 'option_fields' => [], 'price' => $stored['staff_price']]
             : ($product ?? throw ValidationException::withMessages(['sku' => "Unavailable SKU: $sku"]));
-        if (!empty($product['voucher_product'])) {
+        if (! empty($product['voucher_product'])) {
             $recipient = is_array($stored) ? ($stored['options']['gift_recipient'] ?? null) : null;
-            if ($recipient && !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+            if ($recipient && ! filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
                 throw ValidationException::withMessages(['options.gift_recipient' => __('Enter a valid voucher recipient email.')]);
             }
         } elseif (is_array($stored) && isset($stored['staff_price'])) {
@@ -335,6 +338,7 @@ class Pricing
         }
         $custom = $commerceFields->values('line', is_array($stored) ? ($stored['line_fields'] ?? []) : [], $scope, true, $validateFields);
         $value = $product['price'] * $qty;
+
         return [...$product, 'key' => (string) $key, 'options' => $options, 'qty' => $qty, 'subtotal' => $value, ...($custom ? ['line_fields' => $commerceFields->snapshot('line', $custom)] : [])];
     }
 
@@ -348,7 +352,7 @@ class Pricing
 
     public static function publicReceipt(array $receipt): array
     {
-        unset($receipt['return_url'], $receipt['voucher']['id']);
+        unset($receipt['return_url'], $receipt['voucher']['id'], $receipt['checkout_consents']);
         if (isset($receipt['order_fields'])) {
             $receipt['order_fields'] = CommerceFields::visible($receipt['order_fields']);
         }

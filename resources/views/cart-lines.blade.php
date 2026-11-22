@@ -1,5 +1,5 @@
 @foreach($unavailable as $line)
-    <form method="post" class="cart-unavailable" action="{{ route('sellissimo.item', ['cart' => $cart, ...$filters]) }}">
+    <form method="post" data-cart-action class="cart-unavailable" action="{{ route('sellissimo.item', ['cart' => $cart, ...$filters]) }}">
         @csrf
         <input type="hidden" name="return_to" value="cart">
         <input type="hidden" name="sku" value="{{ $line['sku'] }}">
@@ -43,7 +43,7 @@
             <a href="{{ route('sellissimo.item.edit', ['cart'=>$cart, 'line'=>$line['key'] ?? $line['sku'], ...$filters]) }}">{{ __('sellissimo::shop.edit_choices') }}</a>
         @endif
         @if($reduced > 0)
-        <form method="post" action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
+        <form method="post" data-cart-action action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
             @csrf
             <input type="hidden" name="return_to" value="cart">
             <input type="hidden" name="sku" value="{{ $line['sku'] }}">
@@ -52,18 +52,18 @@
             <button class="ss-button">{{ __('sellissimo::shop.reduce_to', ['quantity'=>$reduced]) }}</button>
         </form>
         @endif
-        <form method="post" action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
+        <form method="post" data-cart-action action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
             @csrf
             <input type="hidden" name="return_to" value="cart">
             <input type="hidden" name="sku" value="{{ $line['sku'] }}">
             <input type="hidden" name="line_key" value="{{ $line['key'] }}">
             <label><span>{{ __('sellissimo::shop.quantity') }}</span>
-                <input id="{{ $quantityId }}" type="number" min="0" max="999" required name="quantity" aria-label="{{ __('sellissimo::shop.quantity_for_title', ['title'=>$line['title']]) }}" value="{{ $quantityError ? old('quantity') : $line['qty'] }}" @if($quantityError) aria-invalid="true" aria-describedby="{{ $quantityId }}-error" @endif>
+                <input id="{{ $quantityId }}" data-cart-quantity data-confirmed="{{ $line['qty'] }}" type="number" min="0" max="999" required name="quantity" aria-label="{{ __('sellissimo::shop.quantity_for_title', ['title'=>$line['title']]) }}" value="{{ $quantityError ? old('quantity') : $line['qty'] }}" @if($quantityError) aria-invalid="true" aria-describedby="{{ $quantityId }}-error" @endif>
                 @if($quantityError)<small class="field-error" id="{{ $quantityId }}-error">{{ $errors->first('quantity') }}</small>@endif
             </label>
-            <button class="ss-button">{{ __('sellissimo::shop.update_quantity') }}</button>
+            <button class="ss-button" data-cart-submit>{{ __('sellissimo::shop.update_quantity') }}</button>
         </form>
-        <form method="post" action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
+        <form method="post" data-cart-action action="{{ route('sellissimo.item', ['cart'=>$cart, ...$filters]) }}">
             @csrf
             <input type="hidden" name="return_to" value="cart">
             <input type="hidden" name="sku" value="{{ $line['sku'] }}">

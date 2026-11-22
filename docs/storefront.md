@@ -27,6 +27,20 @@ The catalog, product pages, cart, checkout and signed buyer pages share a Blade 
 
 For a brand adjustment, add a style after the bundled defaults using the layout’s `head` stack, or override `resources/views/vendor/sellissimo/storefront-styles.blade.php`. The stylesheet is scoped to `.ss-store`. Set `--ss-font`, `--ss-accent`, `--ss-accent-text`, `--ss-canvas`, `--ss-surface`, `--ss-border`, and `--ss-focus` to match your site. Choose an accent and text color that remain legible together. Set the trading name in **Store → Settings → Store details and currency**. Custom Antlers storefronts can continue using the existing form tags and JSON API.
 
+### Catalog filters and automatic cart updates
+
+The bundled filter form updates results when a buyer changes a selection or pauses while typing. It updates the query string so buyers can bookmark a search or use Back and Forward. The advanced filters remain in place while results change. Keep the ordinary GET form and pagination links when overriding the view.
+
+For an HTML refresh, GET `/{prefix}` (route `sellissimo.shop`) with the catalog query parameters and `X-Sellissimo-Fragment: catalog`. The response contains the `[data-catalog-results]` element with active filters, count, results and pagination. The bundled `catalog-filters`, `catalog-response` and `catalog-interactions` views share this contract. The JSON catalog endpoint below is available for clients rendering their own list.
+
+On the product page, the quantity input and Add to cart action share a form. In the cart, changing a line quantity automatically refreshes totals and the header count. The script serializes changes before proceeding to checkout. A buyer using ordinary forms can submit the quantity or remove a line. For the same response in a custom theme, POST the session cart's SKU, absolute `quantity` (0–999) and CSRF token to `/{prefix}/cart/{cart}/items` (route `sellissimo.item`). Preserve the `line_key` when editing a personalized line. With `Accept: application/json`, the response contains `html` for the cart content and `cart_label` for the header. The v1 API's separate PUT endpoint returns HTTP 204.
+
+### Trust information and site-wide search
+
+Supply a `resources/views/vendor/sellissimo/trust.blade.php` partial to display merchant information on the bundled product, cart and checkout pages. The partial receives `$placement` as `product`, `cart` or `checkout`. To use it on the catalog, include it from your shop override with `@includeIf('sellissimo::trust', ['placement' => 'catalog'])`. Use delivery costs from the current quote, actual contact details or links to the site's published policies.
+
+A site's global search can combine CMS entries with a grouped product query. Resolve `Sellissimo\Core\CatalogBrowse` from the container and call its `page` method with the active site, validated catalog filters including `q`, and `groupProducts: true`. The first return value is the products paginator. Resolve each card's destination with `Sellissimo\Core\ProductMetadata::storefrontUrl($site, $product)`. Include a result only when the destination is available to buyers on that site. The site owns the combined results page and search navigation.
+
 ## JSON API v1
 
 Base URL: `/api/sellissimo/v1`. Send `Accept: application/json`. Initialize a web session with `GET /session`, retain its cookies, and send the returned token as `X-CSRF-TOKEN` on writes. Requests that read or change a guest cart also need `Authorization: Bearer <cart token>`. Keep the token private to that buyer. A headless web server can maintain a separate cookie jar per buyer. A credentialed browser frontend must use the site's Laravel session and CORS configuration. Account history uses the site's existing Statamic login.
@@ -34,11 +48,11 @@ Base URL: `/api/sellissimo/v1`. Send `Accept: application/json`. Initialize a we
 | Method and path | Input and result |
 | --- | --- |
 | GET /catalog?site=default | Published variants with current prices, ordered gallery images, specifications, categories and availability. Filter by `q` and category slug with `category`. Featured items appear first. |
-| GET /catalog/{sku}?site=default | One published variant with product details, public related products and links between variants via their SKUs. |
+| GET /catalog/{sku}?site=default | One published variant with product details including `product.description_html`, public related products and links between variants via their SKUs. |
 | POST /carts | Optional site handle. Returns the cart ID and guest token, or a null token for an authenticated account cart. |
 | PUT /carts/{id}/items | SKU and absolute quantity from 0 to 999. Zero removes a line. |
-| POST /carts/{id}/quote | Optional address, discount and shipping. Returns current lines, subtotal, discount, tax, quoted options, shipping, total and enabled payment handles. |
-| POST /carts/{id}/checkout | Email, billing country, gateway, optional discount. Physical orders also require a delivery address and a valid shipping option. Returns order, status, checkout URL and private receipt URL. Repeating checkout for the same cart reuses the order. |
+| POST /carts/{id}/quote | Optional address, discount and shipping. Returns current lines, subtotal, discount, tax, quoted options, shipping, total, enabled payment handles and the site's `checkout_policy`. |
+| POST /carts/{id}/checkout | Email, billing country, gateway, optional discount. When configured, include the required `consents` and `policy_version`. Physical orders also require a delivery address and a valid shipping option. Returns order, status, checkout URL and private receipt URL. Repeating checkout for the same cart reuses the order. |
 | GET /orders/{id} | Signed receipt URL or owning user's session. Returns status, tracking, receipt and eligible download links. |
 | GET /orders/{id}/downloads/{sku} | Signed URL or owning user's session. Streams the private file after checking current entitlement. |
 | POST /account/logout | Sign out of the current Statamic session and return to the selected site. Submit with the session CSRF token. |
@@ -87,6 +101,8 @@ Receipts include `parcels`, each with a tracking number and a map of purchased l
 ### Product pages and catalog fields
 
 With the optional storefront enabled, a product's page is at `/shop/products/{sku}` under the configured prefix. Its add-to-cart form increments the selected variant and personalization. The API cart item update uses an absolute quantity.
+
+The product detail's `description_html` renders legacy Markdown or Bard content, including inline images with public asset URLs and alternative text. Use it for a formatted description in a custom storefront. The existing `description` field supplies the original string for Markdown entries and plain text for Bard entries.
 
 Catalog prices and `compare_at_price` use integer minor units. During an active sale, `price` is the sale price and `compare_at_price` is the regular price. `unit_price` contains the price per unit, unit and pack quantity when configured. Each image supplies a public URL and alternative text. Variants can override the cover image. `digital` marks items that require no shipping. `downloadable` distinguishes purchased files from services. The catalog, Antlers products tag and buyer receipts omit internal costs and private file paths.
 
@@ -200,6 +216,23 @@ An account holder can claim a purchase by its displayed number (including legacy
 
 A digital or service-only basket asks for billing country and the fields needed for its tax and order charges. Changing the country refreshes those fields. With JavaScript disabled, **Continue** reveals any additional requirements. A mixed basket uses the physical delivery flow.
 
+### Featured and popular products
+
+Use `sellissimo:featured_products` for editorial picks and `sellissimo:popular_products` for products ranked by retained paid units on the current site. Merchants mark featured entries in the product's **Merchandising** tab. The bundled catalog displays the two lists on the first page when there are no active search, sort or filter criteria. Empty lists stay hidden.
+
+```antlers
+{{ sellissimo:featured_products limit="4" }}
+    <a href="{{ url }}">{{ product_title }}</a>
+{{ /sellissimo:featured_products }}
+
+{{ sellissimo:popular_products site="default" days="30" limit="6" as="ranked" }}
+    {{ if ranked }}<h2>Best sellers this month</h2>{{ /if }}
+    {{ ranked }}<a href="{{ url }}">{{ product_title }}</a>{{ /ranked }}
+{{ /sellissimo:popular_products }}
+```
+
+Both tags accept `site`, `limit` (1–24, default 4) and the optional `as` handle. An aliased list also exposes `no_results`. Each product appears once, with a currently available SKU, product title, URL, price in minor units, currency and images. The popular list accepts `days` (1–365, default 90). Purchases of multiple variants count toward their product. Received returns subtract units and dispatched replacements add units for the replacement product. Fully credited lines, free downloads and voucher products are excluded. A store without qualifying sales has an empty popular list.
+
 ### Building a paginated Antlers shop
 
 `sellissimo:catalog` groups variants into products, supports the bundled shop's search, category, attributes, stock, price range and sorting, and preserves them in pagination links. Set `site`, `per_page` or other filter parameters on the tag to override corresponding URL filters. The original `sellissimo:products` tag still returns individual SKUs.
@@ -213,7 +246,7 @@ A digital or service-only basket asks for billing country and the fields needed 
 {{ /sellissimo:catalog }}
 ```
 
-Use `sellissimo:quote` to post buyer input, including addresses, email, delivery, discounts and custom fields. It returns to your page with the quote saved. Render `sellissimo:shipping_options` (each row has a handle, label and amount) and `sellissimo:payment_gateways` (handle and label) for the current cart and site. After the buyer has reviewed their total, `sellissimo:checkout` submits the saved quote and selected gateway. It includes CSRF and the reviewed quote token. A changed price requires the buyer to review the new total. Use these forms on pages with the optional storefront enabled or disabled.
+Use `sellissimo:quote` to post buyer input, including addresses, email, delivery, discounts and custom fields. It returns to your page with the quote saved. Render `sellissimo:shipping_options` (each row has a handle, label and amount) and `sellissimo:payment_gateways` (handle and label) for the current cart and site. After the buyer has reviewed their total, `sellissimo:checkout` submits the saved quote and selected gateway. It includes CSRF, the reviewed quote token and the policy version. If the site configures policy controls, render their labels, document links and individual checkbox fields inside the form. A changed price requires the buyer to review the new total. Use these forms on pages with the optional storefront enabled or disabled. [Checkout policy fields](checkout-extensions.md#checkout-policies-and-newsletter-opt-in)
 
 ```antlers
 {{ nocache }}

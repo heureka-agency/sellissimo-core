@@ -48,7 +48,7 @@ class Amendments
             ksort($fields);
             $newKey = $unchanged ? $key : LineOptions::key($sku, $options, $fields);
             abort_if(isset($items[$newKey]), 422, 'Combine matching lines before continuing.');
-            $items[$newKey] = ['sku' => $sku, 'qty' => (int) $row['quantity'], 'options' => $options, 'line_fields' => $fields, ...($same && is_array($stored[$key] ?? null) ? \Illuminate\Support\Arr::only($stored[$key], ['staff_price', 'service']) : [])];
+            $items[$newKey] = ['sku' => $sku, 'qty' => (int) $row['quantity'], 'options' => $options, 'line_fields' => $fields, ...($same && is_array($stored[$key] ?? null) ? Arr::only($stored[$key], ['staff_price', 'service']) : [])];
         }
         $cart->items = json_encode($items, JSON_THROW_ON_ERROR);
         $input = ['email' => $order->email, 'address' => $before['address'], 'shipping_address' => $data['shipping_address'] ?? DeliveryAddress::current($order, $before),
@@ -86,6 +86,7 @@ class Amendments
         }
         unset($quote['amount_due'], $quote['voucher']);
         $available = $this->providers->availablePayments([...$quote, 'total' => $difference], $site);
+
         return array_values(array_diff($available, ['pay_on_delivery']));
     }
 
@@ -166,7 +167,7 @@ class Amendments
                 return $row;
             }
             $quote = json_decode($row->proposed, true, flags: JSON_THROW_ON_ERROR);
-            if (!in_array($row->gateway, $this->balanceGateways($quote, (int) $row->difference, $order->site), true)) {
+            if (! in_array($row->gateway, $this->balanceGateways($quote, (int) $row->difference, $order->site), true)) {
                 throw new Contracts\PaymentUnavailable('Check the payment settings for this order amendment.');
             }
             $this->store->db()->transaction(function () use ($id, $order, $row) {
@@ -203,8 +204,8 @@ class Amendments
             $parent = $this->row($id)->order_id;
             $order = $this->store->table('orders')->where('id', $parent)->lockForUpdate()->firstOrFail();
             $row = $this->store->table('amendments')->where('id', $id)->lockForUpdate()->firstOrFail();
-            $rejected = !empty($outcome['request_rejected']);
-            if ($rejected && !PaymentSessions::canReleaseRejected($row)) {
+            $rejected = ! empty($outcome['request_rejected']);
+            if ($rejected && ! PaymentSessions::canReleaseRejected($row)) {
                 return $row;
             }
             if ($row->status !== 'awaiting_payment' || $outcome['status'] === 'pending' || (! empty($outcome['unstarted']) && $row->started_at)) {
@@ -239,6 +240,10 @@ class Amendments
     private function apply(object $order, object $row): void
     {
         $after = json_decode($row->proposed, true);
+        $original = json_decode($order->receipt, true);
+        if (isset($original['checkout_consents'])) {
+            $after['checkout_consents'] = $original['checkout_consents'];
+        }
         if ($order->voucher_id) {
             $returned = (int) $this->store->table('refunds')->where('order_id', $order->id)->whereNotNull('voucher_id')
                 ->where('status', 'succeeded')->whereNotNull('amendment_id')->sum('amount');
@@ -252,6 +257,7 @@ class Amendments
             app(OrderQueueFields::class)->refresh($order->id);
             $this->markApplied($order->id, $row->id);
             $this->store->recordActivity($order->id, 'return', 'Exchange balance settled. '.$row->reason, $row->author);
+
             return;
         }
         $items = $after['_cart_items'];

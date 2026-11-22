@@ -45,14 +45,14 @@
         @if($siteRecord)
         <nav class="ss-nav" aria-label="{{ __('sellissimo::shop.store_navigation') }}">
             @if($hasShop)
-            <a href="{{ route('sellissimo.shop', $catalogParams) }}" @if(request()->routeIs('sellissimo.shop', 'sellissimo.product')) aria-current="{{ request()->routeIs('sellissimo.shop') ? 'page' : 'true' }}" @endif>{{ __('sellissimo::shop.shop') }}</a>
+            <a href="{{ route('sellissimo.shop', $catalogParams) }}" data-catalog-context @if(request()->routeIs('sellissimo.shop', 'sellissimo.product')) aria-current="{{ request()->routeIs('sellissimo.shop') ? 'page' : 'true' }}" @endif>{{ __('sellissimo::shop.shop') }}</a>
             @endif
             @if(in_array('wishlists', $features, true))
             <a href="{{ route('sellissimo.wishes', $siteParams) }}" @if(request()->routeIs('sellissimo.wishes')) aria-current="page" @endif>{{ __('sellissimo::features.wishlist') }}</a>
             @endif
             <a href="{{ route(auth()->check() ? 'sellissimo.history' : 'sellissimo.account.access', $accountParams) }}" @if($accountRoot || $accountChild) aria-current="{{ $accountRoot ? 'page' : 'true' }}" @endif>{{ __(auth()->check() ? 'sellissimo::shop.account' : 'sellissimo::shop.sign_in') }}</a>
             @if($hasShop)
-            <a class="ss-nav-cart" href="{{ route('sellissimo.cart.page', $catalogParams) }}" @if(request()->routeIs('sellissimo.cart.page') || $cartChild) aria-current="{{ $cartChild ? 'true' : 'page' }}" @endif>{{ __('sellissimo::shop.cart_count', ['count' => $cartQuantity]) }}</a>
+            <a data-cart-count class="ss-nav-cart" href="{{ route('sellissimo.cart.page', $catalogParams) }}" data-catalog-context @if(request()->routeIs('sellissimo.cart.page') || $cartChild) aria-current="{{ $cartChild ? 'true' : 'page' }}" @endif>{{ __('sellissimo::shop.cart_count', ['count' => $cartQuantity]) }}</a>
             @endif
         </nav>
         @endif

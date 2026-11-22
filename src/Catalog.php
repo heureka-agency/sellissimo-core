@@ -2,10 +2,14 @@
 
 namespace Sellissimo\Core;
 
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
+use Statamic\Events\EntrySaved;
 use Statamic\Events\EntrySaving;
 use Statamic\Facades\Entry;
 use Statamic\Facades\Site;
+use Statamic\Facades\Stache;
+use Statamic\Stache\Repositories\EntryRepository;
 
 class Catalog
 {
@@ -69,13 +73,13 @@ class Catalog
         $vouchersEnabled = null;
         foreach ($entries as $entry) {
             $gift = (bool) $entry->value('sellissimo_gift_voucher');
-            if ($entry->status() !== 'published' || ($gift && !($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers')))) {
+            if ($entry->status() !== 'published' || ($gift && ! ($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers')))) {
                 continue;
             }
             $url = request()->user()?->can('edit', $entry) ? $entry->editUrl() : null;
             foreach ($this->variants($entry) as $variant) {
                 $sku = $this->sku($variant);
-                if (!preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,99}$/D', $sku) || count($owners[$sku] ?? []) !== 1) {
+                if (! preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,99}$/D', $sku) || count($owners[$sku] ?? []) !== 1) {
                     continue;
                 }
                 $price = filter_var($variant['prices'][$currency] ?? null, FILTER_VALIDATE_INT);
@@ -88,6 +92,7 @@ class Catalog
                 ];
             }
         }
+
         return $rows;
     }
 
@@ -99,9 +104,10 @@ class Catalog
                 $sku = $this->sku($variant);
                 $name = $entry->value('title');
                 $title = trim($name.' '.($variant['label'] ?? ''));
-                $matches[$sku][$title][] = ['id'=>$entry->id(),'title'=>$name];
+                $matches[$sku][$title][] = ['id' => $entry->id(), 'title' => $name];
             }
         }
+
         return $matches;
     }
 
@@ -143,7 +149,7 @@ class Catalog
         }
         $index = $this->skuIndex($this->entries($entry->locale())->reject(fn ($other) => $other->id() === $entry->id()));
         $errors = [];
-        $prerequisite = \Illuminate\Support\Arr::first(\Illuminate\Support\Arr::wrap($entry->value('sellissimo_prerequisite')));
+        $prerequisite = Arr::first(Arr::wrap($entry->value('sellissimo_prerequisite')));
         if ($prerequisite && $prerequisite === $entry->id()) {
             $errors['sellissimo_prerequisite'] = __('A product cannot require itself.');
         }
@@ -185,17 +191,17 @@ class Catalog
     public function refreshEntry($event): void
     {
         $entry = $event->entry;
-        if (Entry::getFacadeRoot() instanceof \Statamic\Stache\Repositories\EntryRepository || !in_array($entry->collectionHandle(), self::collections(), true)) {
+        if (Entry::getFacadeRoot() instanceof EntryRepository || ! in_array($entry->collectionHandle(), self::collections(), true)) {
             return;
         }
         $store = app(Store::class);
-        if (!$store->db()->getSchemaBuilder()->hasTable('sellissimo_catalog_skus')) {
+        if (! $store->db()->getSchemaBuilder()->hasTable('sellissimo_catalog_skus')) {
             return;
         }
         $store->db()->transaction(function () use ($entry, $store, $event) {
             app(CatalogBrowse::class)->invalidate();
             $store->table('catalog_skus')->where('entry_id', $entry->id())->delete();
-            if ($event instanceof \Statamic\Events\EntrySaved) {
+            if ($event instanceof EntrySaved) {
                 $this->indexEntry($entry);
                 foreach ($entry->descendants() as $child) {
                     $store->table('catalog_skus')->where('entry_id', $child->id())->delete();
@@ -207,7 +213,7 @@ class Catalog
 
     private function indexEntry($entry): void
     {
-        if (!$entry->published()) {
+        if (! $entry->published()) {
             return;
         }
         $rows = [];
@@ -224,10 +230,11 @@ class Catalog
 
     public function rebuildIndex(): void
     {
-        if (Entry::getFacadeRoot() instanceof \Statamic\Stache\Repositories\EntryRepository) {
+        if (Entry::getFacadeRoot() instanceof EntryRepository) {
             foreach (self::collections() as $collection) {
-                \Statamic\Facades\Stache::store('entries::'.$collection)->index('sellissimo_skus')->update();
+                Stache::store('entries::'.$collection)->index('sellissimo_skus')->update();
             }
+
             return;
         }
         $store = app(Store::class);
@@ -244,9 +251,8 @@ class Catalog
 
     private function matchingEntries(string $site, array $skus)
     {
-        if (Entry::getFacadeRoot() instanceof \Statamic\Stache\Repositories\EntryRepository) {
-            return collect(self::collections())->flatMap(fn ($collection) =>
-                \Statamic\Facades\Stache::store('entries::'.$collection)->index('sellissimo_skus')->owners($skus))
+        if (Entry::getFacadeRoot() instanceof EntryRepository) {
+            return collect(self::collections())->flatMap(fn ($collection) => Stache::store('entries::'.$collection)->index('sellissimo_skus')->owners($skus))
                 ->unique()->map(fn ($id) => Entry::find($id)?->in($site))->filter()->unique(fn ($entry) => $entry->id());
         }
 
@@ -264,7 +270,7 @@ class Catalog
                 continue;
             }
             $gift = (bool) $entry->value('sellissimo_gift_voucher');
-            if ($gift && !($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers'))) {
+            if ($gift && ! ($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers'))) {
                 continue;
             }
             $categories = array_column(ProductDetails::terms($entry, 'sellissimo_categories', $site), 'title', 'slug');
@@ -273,17 +279,18 @@ class Catalog
             foreach ($this->variants($entry) as $variant) {
                 $sku = $this->sku($variant);
                 $price = filter_var($variant['prices'][$currency] ?? null, FILTER_VALIDATE_INT);
-                if (!preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,99}$/D', $sku) || count($owners[$sku] ?? []) !== 1 || $price === false || $price < 0 || $price > 99999999) {
+                if (! preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,99}$/D', $sku) || count($owners[$sku] ?? []) !== 1 || $price === false || $price < 0 || $price > 99999999) {
                     continue;
                 }
-                if ($gift && !$price) {
+                if ($gift && ! $price) {
                     continue;
                 }
                 $attributes = array_filter($variant['attributes'] ?? [], fn ($value) => is_scalar($value) && filled($value));
                 $digital = $gift || Downloads::paths($variant['download'] ?? null) || $entry->value('sellissimo_service');
                 yield ['entry_id' => $entry->id(), 'sku' => $sku, 'featured' => (bool) $entry->value('sellissimo_featured'), 'categories' => $categories,
+                    'upsell_group' => mb_strtolower(trim((string) $entry->value('sellissimo_upsell_group'))), 'product_type' => mb_strtolower(trim((string) $entry->value('sellissimo_product_type'))),
                     'attributes' => $attributes, 'price' => $gift ? $price : ProductDetails::offer($entry, $variant, $currency, $price)['price'],
-                    'tracked' => !$digital && $entry->value('sellissimo_track_stock') !== false,
+                    'tracked' => ! $digital && $entry->value('sellissimo_track_stock') !== false,
                     'words' => mb_strtolower(implode(' ', [...$words, $sku, $variant['label'] ?? '', $variant['barcode'] ?? '']))];
             }
         }
@@ -292,7 +299,7 @@ class Catalog
     /** Resolve siblings and related entries only for the selected products. */
     public function browseProducts(string $site, array $skus, bool $siblings = false): array
     {
-        if (!$skus) {
+        if (! $skus) {
             return [];
         }
         $entries = $this->matchingEntries($site, $skus);
@@ -327,21 +334,21 @@ class Catalog
                 continue;
             }
             $gift = (bool) $entry->value('sellissimo_gift_voucher');
-            if ($gift && !($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers'))) {
+            if ($gift && ! ($vouchersEnabled ??= StoreFeatures::enabled($site, 'vouchers'))) {
                 continue;
             }
-            $prerequisite = \Illuminate\Support\Arr::first(\Illuminate\Support\Arr::wrap($entry->value('sellissimo_prerequisite')));
+            $prerequisite = Arr::first(Arr::wrap($entry->value('sellissimo_prerequisite')));
             $details = $withDetails ? ProductDetails::presentation($entry, $site) : [];
             foreach ($this->variants($entry) as $variant) {
                 $sku = $this->sku($variant);
-                if ($wanted !== null && !isset($wanted[$sku])) {
+                if ($wanted !== null && ! isset($wanted[$sku])) {
                     continue;
                 }
                 $price = filter_var($variant['prices'][$currency] ?? null, FILTER_VALIDATE_INT);
                 if (! preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,99}$/D', $sku) || count($index[$sku] ?? []) !== 1 || $price === false || $price < 0 || $price > 99999999) {
                     continue;
                 }
-                if ($gift && !$price) {
+                if ($gift && ! $price) {
                     continue;
                 }
                 $offer = $gift ? ['price' => $price, 'compare_at_price' => null] : ProductDetails::offer($entry, $variant, $currency, $price);
@@ -352,13 +359,13 @@ class Catalog
                     'entry_id' => $entry->id(), 'product_title' => $entry->value('title'), 'sku' => $sku, 'title' => trim($entry->value('title').' '.($variant['label'] ?? '')),
                     ...($prerequisite ? ['prerequisite_id' => $prerequisite] : []),
                     ...($gift ? ['voucher_product' => true] : []), ...$offer, 'currency' => $currency, 'tax_class' => $entry->value('sellissimo_tax_class') ?: 'standard',
-                    ...(!$digital && $entry->value('sellissimo_track_stock') === false ? ['track_stock' => false] : []),
+                    ...(! $digital && $entry->value('sellissimo_track_stock') === false ? ['track_stock' => false] : []),
                     'option_fields' => ($gift ? ['gift_recipient' => ['label' => __('Recipient email (defaults to buyer)'), 'required' => false, 'max_length' => 250]] : [])
                         + LineOptions::definitions($entry->value('sellissimo_options') ?: []),
                     'digital' => $digital, 'downloadable' => $downloadable, 'file' => count($files) > 1 ? $files : ($files[0] ?? null),
                     'download_limit' => max(0, filled($variant['download_limit'] ?? null) ? (int) $variant['download_limit'] : $defaultDownloadLimit),
                     ...($downloadable ? ['download_days' => max(0, filled($variant['download_days'] ?? null) ? (int) $variant['download_days'] : $defaultDownloadDays)] : []),
-                    ...(!$digital && $entry->value('sellissimo_final_sale') ? ['final_sale' => true] : []),
+                    ...(! $digital && $entry->value('sellissimo_final_sale') ? ['final_sale' => true] : []),
                     'shipping_details' => $digital ? [] : ProductDetails::parcel($entry, $variant),
                 ];
                 if ($withDetails) {
@@ -382,7 +389,7 @@ class Catalog
                     ->map(fn ($id) => $byEntry->get($id))->filter()->map(fn ($item) => ['sku' => $item['sku'], 'title' => $item['product_title']])->values()->all();
                 unset($product['related_entries']);
             }
-            $product['available'] = !Inventory::tracked($product) ? null : (int) $stock->get($product['sku'], 0);
+            $product['available'] = ! Inventory::tracked($product) ? null : (int) $stock->get($product['sku'], 0);
         }
 
         return $products;

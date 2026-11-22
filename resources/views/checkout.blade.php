@@ -16,7 +16,8 @@
 <div class="checkout-layout"><section class="checkout-content"><h2>{{ $definitions[$step]['label'] }}</h2>
 @if($step === 'contact')
 @if(auth()->guest())<p><a href="{{ route('sellissimo.account.access', ['site'=>$site, 'next'=>'checkout']) }}">{{ __('sellissimo::shop.sign_in') }}</a> · {{ __('sellissimo::shop.continue_as_guest') }}</p>@endif
-<form class="checkout-fields" method="post" enctype="multipart/form-data" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<form id="ss-checkout-step" class="checkout-fields" method="post" enctype="multipart/form-data" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<input type="submit" hidden disabled aria-hidden="true">
 <input type="hidden" name="checkout_step" value="contact">
 @include('sellissimo::text-input', ['input' => ['name' => 'email', 'id' => 'checkout-email', 'label' => __('sellissimo::shop.email'), 'type' => 'email', 'autocomplete' => 'email', 'value' => $contact ?? $recoveryEmail ?? auth()->user()?->email]])
 <input type="hidden" name="recovery_consent" value="0"><label><span><input type="checkbox" name="recovery_consent" value="1" @checked(old('recovery_consent', (bool) $recoveryEmail))> {{ __('sellissimo::shop.email_me_a_link_if_i_leave_this_cart_behind') }}</span></label>
@@ -44,22 +45,20 @@
 @endif
 @if($orderControls)<fieldset><legend>{{ __('sellissimo::shop.order_details') }}</legend>@include('sellissimo::commerce-fields', ['fields'=>$orderControls, 'prefix'=>'order_fields', 'values'=>$fieldValues])</fieldset>@endif
 
-@include('sellissimo::checkout-codes')
 <button>{{ __('sellissimo::shop.continue') }}</button></form>
 @elseif($step === 'delivery')
 <p>{{ implode(', ', array_filter($receipt['shipping_address'] ?? $receipt['address'])) }} · <a href="{{ $link('contact') }}">{{ __('sellissimo::shop.edit_address') }}</a></p>
 @if(!$receipt['delivery_ready'])
 <p role="status">{{ __('sellissimo::shop.delivery_pending') }} @if(empty(($receipt['shipping_address'] ?? $receipt['address'])['country'])){{ __('sellissimo::shop.enter_your_delivery_address_to_see_rates') }}@elseif(!$receipt['options']){{ __('sellissimo::shop.no_delivery_method_is_available_for_this_address_check_the_address_or_contact_the_store') }}@elseif(!$receipt['shipping']){{ __('sellissimo::shop.select_a_delivery_method_and_update_your_total') }}@else {{ __('sellissimo::shop.complete_your_delivery_address_and_update_your_total') }}@endif</p>
 @endif
-<form class="checkout-fields" method="post" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<form id="ss-checkout-step" class="checkout-fields" method="post" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<input type="submit" hidden disabled aria-hidden="true">
 <input type="hidden" name="checkout_step" value="delivery">
-<fieldset><legend>{{ __('sellissimo::shop.pricing_and_delivery') }}</legend>
-@include('sellissimo::checkout-codes')
-@if($receipt['options'])<label>{{ __('sellissimo::shop.delivery') }}<select name="shipping">@foreach($receipt['options'] as $key=>$option)<option value="{{ $key }}" @selected($receipt['shipping_method']===$key)>{{ $option['label'] }} — {{ \Sellissimo\Core\Money::display($option['amount'],$receipt['currency']) }}</option>@endforeach</select></label>@endif
-</fieldset>
+@include('sellissimo::checkout-methods', ['methodType' => 'shipping'])
 @if($receipt['options'])<button>{{ __('sellissimo::shop.continue') }}</button>@endif</form>
 @elseif(isset($definitions[$step]['fields']))
-<form class="checkout-fields" method="post" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<form id="ss-checkout-step" class="checkout-fields" method="post" action="{{ route('sellissimo.quote', $cart) }}">@csrf
+<input type="submit" hidden disabled aria-hidden="true">
 <input type="hidden" name="checkout_step" value="{{ $step }}">
 @include('sellissimo::checkout-step-fields', ['definition'=>$definitions[$step], 'handle'=>$step, 'quote'=>$receipt])
 <button>{{ __('sellissimo::shop.continue') }}</button></form>
@@ -77,22 +76,26 @@
 @if($receipt['missing_billing_fields'] || $receipt['missing_shipping_fields'])
 <p role="alert">{{ __('sellissimo::shop.enter_billing_fields_to_calculate_your_total', ['fields'=>implode(', ', array_merge($receipt['missing_billing_fields'], $receipt['missing_shipping_fields']))]) }} <a href="{{ $link('contact') }}">{{ __('sellissimo::shop.edit_address') }}</a></p>
 @elseif(!$receipt['stock_shortages'])
-<form class="checkout-fields" method="post" action="{{ route('sellissimo.checkout',$cart) }}">@csrf
+<form id="ss-checkout-step" class="checkout-fields" method="post" action="{{ route('sellissimo.checkout',$cart) }}">@csrf
+<input type="submit" hidden disabled aria-hidden="true">
 <input type="hidden" name="checkout_step" value="review"><input type="hidden" name="quote_token" value="{{ \Sellissimo\Core\Pricing::fingerprint($receipt) }}">
-@if(($receipt['amount_due'] ?? $receipt['total']) > 0 && $gateways)<label>{{ __('sellissimo::shop.payment') }}<select name="gateway" required>@foreach($gateways as $gateway)<option value="{{ $gateway }}">{{ $gateway === 'pay_on_delivery' ? __('sellissimo::shop.pay_on_delivery') : ucfirst(str_replace('_',' ',$gateway)) }}</option>@endforeach</select></label>@endif
-@foreach(\Sellissimo\Core\OperationalSettings::policyLinks($site) as $type => $url)
-<p><a href="{{ $url }}">{{ $type === 'terms_page' ? __('Terms and conditions') : __('Privacy policy') }}</a></p>
-@endforeach
-@if(($receipt['amount_due'] ?? $receipt['total']) > 0 && !$gateways)<p role="status">{{ __('sellissimo::shop.online_payment_is_currently_unavailable') }}</p>@else<button>{{ __('sellissimo::shop.place_order') }}</button>@endif</form>
+@if(($receipt['amount_due'] ?? $receipt['total']) > 0)
+@include('sellissimo::checkout-methods', ['methodType' => 'gateway'])
+@endif
+@include('sellissimo::checkout-policies')
+</form>
 @endif
 @endif</section>
 <aside id="checkout-summary" class="checkout-summary" tabindex="-1" aria-labelledby="checkout-summary-heading"><h2 id="checkout-summary-heading">{{ __('sellissimo::shop.order_summary') }}</h2>
 @include('sellissimo::order-lines')
 @foreach($receipt['stock_shortages'] as $sku => $available)<p role="alert">{{ __('sellissimo::shop.sku_has_count_available_reduce_the_quantity_or_remove_it_to_continue', ['sku'=>$sku, 'count'=>$available]) }}</p>@endforeach
 @include('sellissimo::order-breakdown')
+@include('sellissimo::checkout-codes')
 <strong class="ss-total">{{ __('sellissimo::shop.'.($receipt['delivery_ready'] && !$receipt['missing_billing_fields'] && !$receipt['missing_shipping_fields'] ? 'total' : 'estimated_total')) }} · {{ \Sellissimo\Core\Money::display($receipt['total'],$receipt['currency']) }}</strong>
+@includeIf('sellissimo::trust', ['placement' => 'checkout'])
 </aside></div>
 <a class="checkout-mobile-total" href="#checkout-summary"><span>{{ __('sellissimo::shop.order_summary') }}</span><strong class="ss-total">{{ __('sellissimo::shop.'.($receipt['delivery_ready'] && !$receipt['missing_billing_fields'] && !$receipt['missing_shipping_fields'] ? 'total' : 'estimated_total')) }} · {{ \Sellissimo\Core\Money::display($receipt['total'],$receipt['currency']) }}</strong></a>
+@include('sellissimo::checkout-codes-script')
 @if($step === 'contact')
 <script>
 (() => {
@@ -144,6 +147,7 @@
         }
         picker.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    form.addEventListener('sellissimo:codes', () => { if (digital) refresh(); });
     if (digital && digital.querySelector('[data-region-country]').value) refresh();
 })();
 </script>

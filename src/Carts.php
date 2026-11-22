@@ -40,6 +40,9 @@ class Carts
             abort_unless($quantity >= 0 && $quantity <= 999, 422);
             if ($lineKey !== null) {
                 $existing = $items[$lineKey] ?? null;
+                if ($quantity === 0 && $existing === null) {
+                    return;
+                }
                 abort_unless($existing !== null && (is_array($existing) ? $existing['sku'] : $lineKey) === $sku, 422, 'Unknown cart line.');
                 $custom = array_replace(is_array($existing) ? ($existing['line_fields'] ?? []) : [], $custom ?? []);
                 $options = array_replace(is_array($existing) ? ($existing['options'] ?? []) : [], $options ?? []);

@@ -35,5 +35,8 @@ class Store
             'order_id' => $orderId, 'kind' => $kind, 'message' => $message, 'created_at' => now(),
             'author' => $author, 'author_id' => $authorId, 'request_id' => $requestId,
         ]);
+        if (in_array($kind, ['payment', 'refund', 'return', 'cancellation', 'amendment', 'import'], true)) {
+            $this->db()->afterCommit(fn () => app(PurchaseTrends::class)->orderChanged($orderId));
+        }
     }
 }

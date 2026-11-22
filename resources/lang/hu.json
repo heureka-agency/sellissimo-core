@@ -1,0 +1,17 @@
+{
+    "Complementary products": "Kiegészítő termékek",
+    "Automatically match complementary products": "Kiegészítő termékek automatikus párosítása",
+    "Product upgrades": "Magasabb kategóriájú változatok",
+    "Automatically match product upgrades": "Magasabb kategóriájú változatok automatikus párosítása",
+    "Show these products first, in the selected order.": "Ezek a termékek jelennek meg először, a megadott sorrendben.",
+    "Show these alternatives first, in the selected order.": "Ezek a változatok jelennek meg először, a megadott sorrendben.",
+    "Off": "Kikapcsolva",
+    "Hand-picked only": "Csak kézi",
+    "Hand-picked and automatic": "Kézi és automatikus",
+    "Complementary category pairs": "Egymást kiegészítő kategóriák",
+    "Add pair": "Kategóriapár hozzáadása",
+    "Product category": "Termékkategória",
+    "Complementary category": "Kiegészítők kategóriája",
+    "Alternative product group": "Alternatív termékek csoportja",
+    "Use the same group on interchangeable products to suggest higher-priced options.": "Az egymást helyettesítő termékeknél adj meg azonos csoportot a drágább változatok ajánlásához."
+}

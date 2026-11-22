@@ -4,6 +4,12 @@ fields:
     field: { type: toggle, display: Featured product, instructions: 'Show this product first in the included shop.' }
   - handle: sellissimo_related
     field: { type: sellissimo_related, display: Related products, mode: select, max_items: 12, create: false, localizable: true }
+  - handle: sellissimo_cross_sells
+    field: { type: sellissimo_related, display: Complementary products, mode: select, max_items: 12, create: false, localizable: true, instructions: 'Show these products first, in the selected order.' }
+  - handle: sellissimo_upsells
+    field: { type: sellissimo_related, display: Product upgrades, mode: select, max_items: 12, create: false, localizable: true, instructions: 'Show these alternatives first, in the selected order.' }
+  - handle: sellissimo_upsell_group
+    field: { type: text, display: Alternative product group, localizable: true, character_limit: 150, instructions: 'Use the same group on interchangeable products to suggest higher-priced options.' }
   - handle: sellissimo_seo_title
     field: { type: text, display: Search title, character_limit: 70, localizable: true }
   - handle: sellissimo_seo_description

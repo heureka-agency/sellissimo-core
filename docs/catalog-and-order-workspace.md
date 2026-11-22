@@ -20,6 +20,23 @@ A batch accepts 20,000 rows and 16 MiB of CSV data. A ZIP accepts 100 MiB of exp
 
 The preview shows changed rows, conflicts, new assets and terms, and the old and new warehouse balance. Resolve all preview conflicts before applying. Large imports save up to 100 complete products per step. Pause between steps or reopen a recent preview under your account to resume. If a product or warehouse balance changed since preview, review a fresh preview. Completed steps remain recorded. Repeated confirmation of a completed step leaves quantities and stock history intact. The scheduled cleanup removes staged files and previews after seven days.
 
+### Formatted descriptions
+
+In the product editor, use the description toolbar for headings, lists, links and inline images. Pick images from **Product images** and enter alternative text that describes what the image contributes to the description. The gallery and its cover are edited separately.
+
+| CSV column | Cell contents |
+| --- | --- |
+| `description` | Markdown text for a legacy or plain-text import. |
+| `description_bard` | A JSON list of Bard nodes. Export an edited product to see its current structure. |
+
+Populate one description column per product, including across its variant rows. An empty cell preserves the current description. Use `__CLEAR__` to remove it. Here is a single `description_bard` cell's value before ordinary CSV quoting.
+
+```json
+[{"type":"paragraph","content":[{"type":"text","text":"Solid oak."}]},{"type":"image","attrs":{"src":"asset::sellissimo_products::details/oak.png","alt":"End grain of the oak board"}}]
+```
+
+A CSV can reference an image already present at `details/oak.png` in the product image container. To transfer the file to another store, use **Export with product images (ZIP)**. The ZIP includes `images/details/oak.png` alongside the CSV. Its optional root `image-alt.json` maps container-relative paths to asset alternative text, for example `{"details/oak.png":"Oak grain"}`. Import applies that metadata to newly created assets and preserves existing asset metadata. The inline image's own alternative text travels in the Bard JSON.
+
 ## Filter orders by an order field
 
 In **Store → Orders → Filters**, select a supported order-blueprint field, choose or enter the exact value, and apply the filter. Text matching ignores case and surrounding spaces. Use **Columns** to add and reorder that field, then save the queue under **Saved views**. The queue reflects the current operational value after staff corrections. Attachments are available in the order detail.

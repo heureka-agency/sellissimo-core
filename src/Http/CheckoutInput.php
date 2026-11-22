@@ -3,6 +3,8 @@
 namespace Sellissimo\Core\Http;
 
 use Illuminate\Http\Request;
+use Sellissimo\Core\DeliveryFields;
+use Sellissimo\Core\PostalRegions;
 
 class CheckoutInput
 {
@@ -14,7 +16,7 @@ class CheckoutInput
         $destination = $separate ? 'shipping_address' : 'address';
         $required = ['address' => ['country', ...$receipt['missing_billing_fields']]];
         if (collect($receipt['lines'])->contains(fn ($line) => ! $line['digital'])) {
-            $required[$destination] = [...($required[$destination] ?? []), ...\Sellissimo\Core\DeliveryFields::required($receipt[$destination] ?? []), ...$receipt['missing_shipping_fields']];
+            $required[$destination] = [...($required[$destination] ?? []), ...DeliveryFields::required($receipt[$destination] ?? []), ...$receipt['missing_shipping_fields']];
         }
         $missing = [];
         foreach ($required as $group => $fields) {
@@ -24,6 +26,7 @@ class CheckoutInput
                 }
             }
         }
+
         return $missing;
     }
 
@@ -36,7 +39,7 @@ class CheckoutInput
             'order_fields' => 'sometimes|array|max:100', 'voucher' => 'nullable|string|max:80',
             'shipping_instructions' => 'nullable|string|max:500', 'shipping' => 'nullable|string|max:100', 'discount' => 'nullable|string|max:80',
             'email' => ($checkout ? 'required' : 'nullable').'|email|max:254',
-            ...($checkout ? ['gateway' => 'nullable|string|max:80', 'quote_token' => 'nullable|regex:/^[a-f0-9]{64}$/D'] : []),
+            ...($checkout ? ['consents' => 'sometimes|array:terms,privacy,newsletter', 'policy_version' => 'nullable|string|size:64', 'gateway' => 'nullable|string|max:80', 'quote_token' => 'nullable|regex:/^[a-f0-9]{64}$/D'] : []),
         ];
         foreach (['address', 'shipping_address'] as $key) {
             $rules[$key] = 'sometimes|array:'.implode(',', self::ADDRESS_FIELDS);
@@ -50,7 +53,7 @@ class CheckoutInput
         $data = $request->validate($rules);
         foreach (['address', 'shipping_address'] as $key) {
             if (isset($data[$key])) {
-                $data[$key] = \Sellissimo\Core\PostalRegions::address($data[$key]);
+                $data[$key] = PostalRegions::address($data[$key]);
             }
         }
 

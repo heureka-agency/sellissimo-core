@@ -3,6 +3,7 @@
 namespace Sellissimo\Core;
 
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class AccountCarts
 {
@@ -15,7 +16,7 @@ class AccountCarts
         $customer ??= $request->user()?->getAuthIdentifier();
         if (isset($saved['retry'])) {
             $active = $this->store->table('carts')->where('id', $saved['id'])->where('retry_order_id', $saved['retry'])->exists()
-                && !$this->store->table('orders')->where('cart_id', $saved['id'])->exists();
+                && ! $this->store->table('orders')->where('cart_id', $saved['id'])->exists();
             if (($saved['buyer'] ?? null) === $customer && $active) {
                 return $saved;
             }
@@ -41,7 +42,7 @@ class AccountCarts
                 && hash_equals($guest->token_hash, hash('sha256', $saved['token']))) {
                 return $saved;
             }
-            if (!$target && !$guest) {
+            if (! $target && ! $guest) {
                 // Currency-specific mappings from other devices still belong to this account.
                 $previous = $this->store->table('carts as c')->join('sellissimo_account_carts as a', 'a.cart_id', '=', 'c.id')
                     ->leftJoin('sellissimo_orders as o', 'o.cart_id', '=', 'c.id')->whereNull('o.id')
@@ -77,10 +78,10 @@ class AccountCarts
                 $titles = json_decode($target->line_titles ?? '{}', true) + json_decode($guest->line_titles ?? '{}', true);
                 $this->store->table('carts')->where('id', $id)->update(['line_titles' => json_encode($titles, JSON_THROW_ON_ERROR), 'active_at' => now(), 'line_count' => count($items), 'items' => json_encode($items, JSON_THROW_ON_ERROR)]);
                 $this->store->table('field_uploads')->where('scope', CommerceFields::scope($guest))->update(['scope' => CommerceFields::scope($target)]);
-                if ($guest->recovered_at && !$target->recovered_at) {
-                    $this->store->table('carts')->where('id',$id)->update(['recovered_at'=>$guest->recovered_at]);
+                if ($guest->recovered_at && ! $target->recovered_at) {
+                    $this->store->table('carts')->where('id', $id)->update(['recovered_at' => $guest->recovered_at]);
                 }
-                if (!$target->order_fields && $guest->order_fields) {
+                if (! $target->order_fields && $guest->order_fields) {
                     $this->store->table('carts')->where('id', $id)->update(['order_fields' => $guest->order_fields]);
                 }
                 $this->store->table('carts')->where('id', $guest->id)->delete();
@@ -98,31 +99,39 @@ class AccountCarts
         return $key;
     }
 
-    /** The navigation may appear on a signed receipt. Reading it must never restore or merge a cart. */
-    public function storefrontQuantity(Request $request, string $site): int
+    /** Read an authorized, open cart without restoring, creating or merging it. */
+    public function storefrontCart(Request $request, string $site): ?object
     {
         $buyer = $request->user()?->getAuthIdentifier();
         $saved = $request->session()->get('sellissimo.cart.'.$site);
         $cart = null;
-        if ($saved && (!isset($saved['retry']) || ($saved['buyer'] ?? null) === $buyer)) {
+        if ($saved && (! isset($saved['retry']) || ($saved['buyer'] ?? null) === $buyer)) {
             $cart = $this->readForHeader($saved['id'], $saved['token'] ?? null, $buyer, $site);
             if (isset($saved['retry']) && $cart?->retry_order_id !== $saved['retry']) {
                 $cart = null;
             }
         }
-        if (!$cart && $buyer !== null) {
+        if (! $cart && $buyer !== null) {
             $scope = $this->accountScope((string) $buyer, $site, $this->catalog->currency($site));
             $id = $this->store->table('account_carts')->where('scope', $scope)->value('cart_id');
             if ($id) {
                 $cart = $this->readForHeader($id, null, $buyer, $site);
             }
         }
-        if (!$cart || in_array($cart->items, ['{}', '[]'], true) || app(CartCurrency::class)->stale($cart)) {
-            return 0;
+        if (! $cart || in_array($cart->items, ['{}', '[]'], true) || app(CartCurrency::class)->stale($cart)) {
+            return null;
         }
 
         $cart->customer = $buyer;
-        return app(Pricing::class)->cartQuantity($cart);
+
+        return $cart;
+    }
+
+    public function storefrontQuantity(Request $request, string $site): int
+    {
+        $cart = $this->storefrontCart($request, $site);
+
+        return $cart ? app(Pricing::class)->cartQuantity($cart) : 0;
     }
 
     private function accountScope(string $customer, string $site, string $currency): string
@@ -134,11 +143,11 @@ class AccountCarts
     {
         try {
             $cart = $this->carts->get($id, $token, $buyer);
-        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+        } catch (NotFoundHttpException) {
             return null;
         }
 
-        return $cart->site === $site && !$this->store->table('orders')->where('cart_id', $id)->exists() ? $cart : null;
+        return $cart->site === $site && ! $this->store->table('orders')->where('cart_id', $id)->exists() ? $cart : null;
     }
 
     private function open(?string $id): ?object

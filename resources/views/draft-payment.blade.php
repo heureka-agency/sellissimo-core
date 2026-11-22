@@ -22,7 +22,10 @@
 @include('sellissimo::checkout-step-fields', compact('definition', 'handle', 'quote'))
 </fieldset>@endif
 @endforeach
-@if(($quote['amount_due'] ?? $quote['total']) && $gateways)<label>{{ __('sellissimo::shop.payment_method') }}<select name="gateway" required>@foreach($gateways as $method)<option value="{{ $method }}">{{ $method === 'pay_on_delivery' ? __('sellissimo::shop.pay_on_delivery') : \Illuminate\Support\Str::headline($method) }}</option>@endforeach</select></label>@endif
-@if(($quote['amount_due'] ?? $quote['total']) && !$gateways)<p>{{ __('sellissimo::shop.no_payment_method_is_currently_available_for_this_order') }}</p>@else<button>{{ __('sellissimo::shop.place_order') }}</button>@endif</form>
+@if(($quote['amount_due'] ?? $quote['total']) > 0)
+@include('sellissimo::checkout-methods', ['methodType' => 'gateway', 'receipt' => $quote])
+@endif
+@include('sellissimo::checkout-policies', ['receipt' => $quote])
+</form>
 </article>
 @endsection

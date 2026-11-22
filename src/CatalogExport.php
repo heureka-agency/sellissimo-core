@@ -4,6 +4,7 @@ namespace Sellissimo\Core;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Statamic\Facades\AssetContainer;
 use Statamic\Facades\Collection;
 use Statamic\Facades\Entry;
 use ZipArchive;
@@ -22,7 +23,7 @@ class CatalogExport
         foreach (['barcode', 'mpn', 'weight_kg', 'length_cm', 'width_cm', 'height_cm'] as $key) {
             $row[$key] = $value($key);
         }
-        foreach (['categories','tags','gallery'] as $key) {
+        foreach (['categories', 'tags', 'gallery'] as $key) {
             $items = (array) $entry->value('sellissimo_'.$key);
             if ($key !== 'gallery') {
                 $items = array_map(fn ($term) => Str::after($term, '::'), $items);
@@ -33,6 +34,10 @@ class CatalogExport
         $row['variant_image'] = (array) ($variant['image'] ?? []);
         $row['variant_image'] = reset($row['variant_image']) ?: '';
         $row['stock'] = '';
+        $description = $entry->value('sellissimo_description');
+        $row['description'] = is_string($description) ? $description : '';
+        $row['description_bard'] = is_array($description)
+            ? json_encode($description, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) : '';
         foreach (CatalogImport::COLUMNS as $column) {
             if (! array_key_exists($column, $row)) {
                 $field = $column === 'country_of_origin' ? 'origin' : $column;
@@ -67,6 +72,7 @@ class CatalogExport
                 }
             }
         }
+
         return $balances;
     }
 
@@ -109,7 +115,7 @@ class CatalogExport
             $openPart();
             $includeStock = $user->can('manage sellissimo inventory');
             $images = [];
-            $container = \Statamic\Facades\AssetContainer::find('sellissimo_products');
+            $container = AssetContainer::find('sellissimo_products');
             if ($withImages) {
                 abort_unless($container && $user->can('view', $container), 403);
             }
@@ -123,14 +129,16 @@ class CatalogExport
                         if ($row['sku'] === '') {
                             continue;
                         }
-                        if ($includeStock && $entry->value('sellissimo_track_stock') !== false && !$entry->value('sellissimo_service')
-                            && !filled($variant ? ($variant['download'] ?? null) : $entry->value('sellissimo_download'))) {
+                        if ($includeStock && $entry->value('sellissimo_track_stock') !== false && ! $entry->value('sellissimo_service')
+                            && ! filled($variant ? ($variant['download'] ?? null) : $entry->value('sellissimo_download'))) {
                             if (isset($stock[$row['sku']])) {
                                 $row['stock'] = json_encode((object) $stock[$row['sku']], JSON_THROW_ON_ERROR);
                             }
                         }
                         if ($withImages) {
-                            foreach ([...json_decode($row['gallery'] ?: '[]', true), $row['variant_image']] as $path) {
+                            $description = $entry->value('sellissimo_description');
+                            $embedded = is_array($description) ? ProductDescription::images($description) : [];
+                            foreach ([...json_decode($row['gallery'] ?: '[]', true), $row['variant_image'], ...$embedded] as $path) {
                                 if ($path !== '') {
                                     $images[CatalogImportMedia::path($path)] = true;
                                 }
@@ -160,10 +168,17 @@ class CatalogExport
                 foreach ($files as $part) {
                     $zip->addFile($part, basename($part));
                 }
+                $imageDescriptions = [];
                 foreach (array_keys($images) as $path) {
                     $asset = $container->asset($path);
                     abort_unless($asset && $asset->isImage() && $user->can('view', $asset), 422, "Product image unavailable: $path.");
                     $zip->addFromString('images/'.$path, $container->disk()->filesystem()->get($path));
+                    if (is_string($alt = $asset->get('alt')) && $alt !== '') {
+                        $imageDescriptions[$path] = $alt;
+                    }
+                }
+                if ($imageDescriptions) {
+                    $zip->addFromString('image-alt.json', json_encode((object) $imageDescriptions, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
                 }
                 throw_unless($zip->close(), 'Could not finish catalog archive.');
             }

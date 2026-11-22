@@ -43,15 +43,18 @@
     @section('sellissimo.error.quantity', 'product-quantity')
     @section('sellissimo.label.quantity', __('sellissimo::shop.quantity'))
 @endif
-<label>{{ __('sellissimo::shop.quantity') }}<input id="product-quantity" type="number" name="quantity" value="{{ old('quantity',1) }}" min="1" max="{{ min(999,$product['available'] ?? 999) }}" required @if($errors->has('quantity')) aria-invalid="true" aria-describedby="product-quantity-error" @endif>
-@error('quantity')<small class="field-error" id="product-quantity-error">{{ $message }}</small>@enderror</label><div><button class="ss-button--primary">{{ __('sellissimo::shop.add_to_cart') }}</button></div>
+<div class="product-buy-actions"><label for="product-quantity">{{ __('sellissimo::shop.quantity') }}</label>
+<input id="product-quantity" type="number" name="quantity" value="{{ old('quantity',1) }}" min="1" max="{{ min(999,$product['available'] ?? 999) }}" required @if($errors->has('quantity')) aria-invalid="true" aria-describedby="product-quantity-error" @endif>
+<button class="ss-button--primary">{{ __('sellissimo::shop.add_to_cart') }}</button>
+@error('quantity')<small class="field-error" id="product-quantity-error">{{ $message }}</small>@enderror</div>
 </form>@endif
+@includeIf('sellissimo::trust', ['placement' => 'product'])
 @include('sellissimo::product-saved-actions')
 @if(!empty($product['final_sale']))<p>{{ __('sellissimo::shop.final_sale') }}</p>
 @elseif(!$product['digital'] && $returnDays !== null)<p>{{ __('sellissimo::shop.product_return_window', ['days' => $returnDays]) }}</p>@endif
 
 </div></div>
-@if($product['description'])<section class="ss-panel"><h2>{{ __('sellissimo::shop.description') }}</h2>{!! \Illuminate\Support\Str::markdown($product['description'], ['html_input'=>'strip','allow_unsafe_links'=>false]) !!}</section>@endif
+@if($product['description_html'])<section class="ss-panel ss-product-description"><h2>{{ __('sellissimo::shop.description') }}</h2>{!! $product['description_html'] !!}</section>@endif
 <section class="ss-panel"><h2>{{ __('sellissimo::shop.product_details') }}</h2><dl class="product-specs">
 <dt>SKU</dt><dd>{{ $product['sku'] }}</dd>
 @foreach(['barcode'=>__('sellissimo::shop.barcode'),'mpn'=>__('sellissimo::shop.part_number')] as $key=>$label)@if(filled($product[$key]))<dt>{{ $label }}</dt><dd>{{ $product[$key] }}</dd>@endif @endforeach
@@ -60,4 +63,5 @@
 @foreach(['categories'=>__('sellissimo::shop.categories'),'tags'=>__('sellissimo::shop.tags')] as $key=>$label)@if($product[$key])<dt>{{ $label }}</dt><dd>{{ implode(', ',array_column($product[$key], 'title')) }}</dd>@endif @endforeach
 </dl></section>
 @if($product['related'])<section class="ss-panel"><h2>{{ __('sellissimo::shop.related_products') }}</h2><ul>@foreach($product['related'] as $item)<li><a href="{{ route('sellissimo.product', ['sku'=>$item['sku'],'site'=>$site, ...$filters]) }}">{{ $item['title'] }}</a></li>@endforeach</ul></section>@endif
+@include('sellissimo::product-merchandising')
 @endsection

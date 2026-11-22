@@ -52,16 +52,22 @@ The default Products blueprint has four tabs. Existing products can continue sel
 
 | Tab | What merchants can edit |
 | --- | --- |
-| Product details | Title, short description, formatted description, ordered image gallery with asset alternative text, brand, product type, categories, tags and specifications. |
+| Product details | Title, short description, Bard description with inline images, ordered image gallery with asset alternative text, brand, product type, categories, tags and specifications. |
 | Pricing and variants | SKU, regular and sale prices in each currency, sale dates, internal item cost, barcode, manufacturer part number, unit pricing, tax class, private download and buyer personalization. Variants can supply their own identifiers, prices, costs, attributes, image and package measurements. |
 | Shipping | Physical package weight in kilograms, dimensions in centimetres, country of origin and customs code. Mark a service as virtual to sell it without stock or shipping. |
-| Merchandising | Featured status, related products, page title and search description. |
+| Merchandising | Featured status, related products, complementary products, product upgrades, alternative product group, page title and search description. |
 
 Run `php please sellissimo:install` after upgrading. It adds the **Product images** asset container, **Product categories** and **Product tags** taxonomies. It upgrades the original generated blueprint to the four-tab layout and preserves merchant-edited layouts. An existing `sellissimo::product` import includes all four groups. For custom layouts, import each group separately with `sellissimo::product_content`, `sellissimo::product_sales`, `sellissimo::product_shipping` and `sellissimo::product_discovery`.
 
 Sale dates include the first and last day in the application timezone. Leave dates empty for an ongoing sale. Unit prices use the current selling price divided by the quantity per pack. Checkout charges the per-pack selling price. Upload public images in **Assets → Product images** and keep purchased files on the private downloads disk.
 
 Draft orders can prefill an account’s optional `sellissimo_billing_address` and `sellissimo_shipping_address` arrays on its Statamic profile. Otherwise they reuse the corresponding address from its latest linked order on the selected site. An editor can change either address for this order.
+
+## Merchandising and buyer checkout
+
+Mark a product **Featured** to include it in the catalog's featured section. The popular section ranks products by paid units retained in the last 90 days. Enable cross-sells or upgrades per site, select products in display order, and choose whether Sellissimo should fill spare places automatically. Both catalog sections also work on custom Antlers pages. [Featured and popular tags](docs/storefront.md#featured-and-popular-products) · [Recommendation settings](docs/store-settings.md#configure-product-recommendations)
+
+The bundled shop updates search results, filters and cart quantities as buyers edit them. Checkout shows delivery and payment choices as cards and keeps coupon and gift voucher controls in the order summary. Stores can request terms acceptance, acknowledgement of a privacy notice and a separate, optional newsletter subscription. [Checkout policies and integrations](docs/checkout-extensions.md#checkout-policies-and-newsletter-opt-in)
 
 ## Operate the shop
 
@@ -112,6 +118,13 @@ Back up the configured commerce database, Statamic collections and blueprints, p
 Upgrade the package versions with Composer, then run `php please sellissimo:install` and rebuild any deployment caches. Flush old Statamic and reverse proxy page caches when enabling the shop. The package excludes its storefront and API from Statamic's default static cache and sends private, no-store responses. Wrap buyer-specific markup on custom pages in a Statamic nocache region or exclude the page. Configure external caches to honor private responses.
 
 See [storefront and API integration](docs/storefront.md) and [extension development](docs/extensions.md).
+
+### Upgrading to 1.1.0
+
+1. Back up the product image container with the rest of the catalog. Update Core and run `php please sellissimo:install`. The migration adds product type and upgrade group to the catalog index and marks listings for rebuild. Existing featured selections and Markdown descriptions continue to work. Saving a description through the new editor writes Bard nodes.
+2. Compare your published views in `resources/views/vendor/sellissimo` with the new catalog, product, cart and checkout views. Custom product pages should render the detail response's `description_html`. Custom CSV pipelines can keep the `description` column for Markdown and read `description_bard` for edited products. [Catalog file formats](docs/catalog-and-order-workspace.md#formatted-descriptions)
+3. Choose recommendation modes for each site. With the default configuration they start off. If you set any of the four recommendation flags in `sellissimo.default_features` before migrating, the migration adds those flags to existing saved site selections. Subsequent Control Panel changes take precedence. [Store settings](docs/store-settings.md#configure-product-recommendations)
+4. Before enabling mandatory policies, publish the relevant entries on each site and update every custom checkout to display the documents and submit their reviewed version. Existing API clients can continue checking out with policy controls disabled. [Checkout request fields](docs/checkout-extensions.md#checkout-policies-and-newsletter-opt-in)
 
 ### Catalog and checkout checks
 

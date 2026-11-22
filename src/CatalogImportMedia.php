@@ -6,6 +6,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 use Statamic\Contracts\Assets\Asset as AssetContract;
 use Statamic\Contracts\Taxonomies\Term as TermContract;
 use Statamic\Facades\AssetContainer;
@@ -56,7 +58,7 @@ class CatalogImportMedia
             if ($zip->numFiles > 3000) {
                 self::invalid('The archive contains too many members.');
             }
-            $csv = $images = $seen = [];
+            $csv = $images = $seen = $imageDescriptions = [];
             $total = $csvBytes = 0;
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $member = $zip->statIndex($i);
@@ -78,6 +80,18 @@ class CatalogImportMedia
                 $total += $member['size'];
                 if ($total > 100 * 1024 * 1024 || ($member['encryption_method'] ?? 0) !== 0) {
                     self::invalid('Choose an unencrypted archive with up to 100 MiB of expanded data.');
+                }
+                if ($name === 'image-alt.json') {
+                    if ($member['size'] > 16 * 1024 * 1024) {
+                        self::invalid('Image descriptions may contain up to 16 MiB.');
+                    }
+                    $descriptions = json_decode((string) $zip->getFromIndex($i), false, 3);
+                    if (! is_object($descriptions)) {
+                        self::invalid('Image descriptions must map image paths to alternative text.');
+                    }
+                    $imageDescriptions = (array) $descriptions;
+
+                    continue;
                 }
                 if (preg_match('~^[\w.-]+\.csv$~iD', $name)) {
                     $csvBytes += $member['size'];
@@ -103,12 +117,12 @@ class CatalogImportMedia
                 }
                 // Dimensions alone can be present in a truncated file. Verify the pixel data using the site's driver.
                 $driver = match (config('statamic.assets.image_manipulation.driver', 'gd')) {
-                    'gd' => \Intervention\Image\Drivers\Gd\Driver::class,
+                    'gd' => Driver::class,
                     'imagick' => \Intervention\Image\Drivers\Imagick\Driver::class,
                     default => config('statamic.assets.image_manipulation.driver'),
                 };
                 try {
-                    $manager = new \Intervention\Image\ImageManager(new $driver);
+                    $manager = new ImageManager(new $driver);
                     if (method_exists($manager, 'decodeBinary')) {
                         $manager->decodeBinary($bytes);
                     } else {
@@ -126,6 +140,12 @@ class CatalogImportMedia
             }
             if (! $csv) {
                 self::invalid('Add a catalog CSV to the root of the ZIP.');
+            }
+            foreach ($imageDescriptions as $path => $alt) {
+                if (! isset($images[$path]) || ! is_string($alt)) {
+                    self::invalid('Each image description must contain text for an image in this archive.');
+                }
+                $images[$path]['alt'] = $alt;
             }
             uksort($csv, 'strnatcasecmp');
 
@@ -204,7 +224,11 @@ class CatalogImportMedia
                 fclose($input);
             }
             try {
-                if ($container->makeAsset($path)->save() === false) {
+                $asset = $container->makeAsset($path);
+                if (isset($staged['alt'])) {
+                    $asset->set('alt', $staged['alt']);
+                }
+                if ($asset->save() === false) {
                     self::invalid("The site declined to save image $path.");
                 }
             } catch (\Throwable $error) {

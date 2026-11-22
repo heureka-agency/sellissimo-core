@@ -6,7 +6,8 @@ use Illuminate\Validation\ValidationException;
 
 class StoreFeatures
 {
-    public const FLAGS = ['wishlists', 'back_in_stock', 'vouchers'];
+    public const FLAGS = ['wishlists', 'back_in_stock', 'vouchers', 'cross_sell', 'upsell', 'auto_cross_sell', 'auto_upsell'];
+
     public const ALERTS = ['order.placed', 'stock.low', 'stock.exhausted'];
 
     public static function enabled(string $site, string $feature): bool
@@ -18,7 +19,7 @@ class StoreFeatures
     {
         $row = app(Store::class)->table('site_features')->where('site', $site)->first();
 
-        return ['features' => $row ? json_decode($row->features, true) : [],
+        return ['features' => $row ? json_decode($row->features, true) : array_values(array_intersect(self::FLAGS, config('sellissimo.default_features', []))),
             'recipients' => $row ? json_decode($row->recipients, true) : [], 'revision' => $row ? (int) $row->revision : 0];
     }
 
@@ -31,7 +32,7 @@ class StoreFeatures
                 'features' => json_encode(array_values(array_intersect(self::FLAGS, $features)), JSON_THROW_ON_ERROR),
                 'recipients' => json_encode($recipients, JSON_THROW_ON_ERROR), 'revision' => $revision + 1,
             ]);
-            if (!$updated) {
+            if (! $updated) {
                 throw ValidationException::withMessages(['revision' => __('The settings changed. Reload before saving.')]);
             }
         }, 3);

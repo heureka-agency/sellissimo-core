@@ -38,7 +38,7 @@ class ProductDetails
     {
         return [
             'entry_id' => $entry->id(), 'product_title' => $entry->value('title'),
-            'summary' => $entry->value('sellissimo_summary'), 'description' => $entry->value('sellissimo_description'),
+            'summary' => $entry->value('sellissimo_summary'), 'description' => ProductDescription::text($entry->value('sellissimo_description')),
             'brand' => $entry->value('sellissimo_brand'), 'product_type' => $entry->value('sellissimo_product_type'),
             'images' => self::images($entry->value('sellissimo_gallery')),
             'categories' => self::terms($entry, 'sellissimo_categories', $site), 'tags' => self::terms($entry, 'sellissimo_tags', $site),

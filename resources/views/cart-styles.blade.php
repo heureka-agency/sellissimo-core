@@ -15,6 +15,8 @@
 .cart-summary .ss-total { margin-block: 1rem .5rem; }
 .cart-summary .ss-muted { font-size: .875rem; }
 .cart-unavailable { margin-block-end: 1rem; }
+#sellissimo-cart [hidden], #sellissimo-cart[data-enhanced] [data-cart-submit] { display: none; }
+#sellissimo-cart [data-cart-status]:empty { margin: 0; padding: 0; border: 0; }
 @media (max-width: 48rem) {
     .cart-layout { grid-template-columns: minmax(0, 1fr); }
     .cart-summary { position: static; }

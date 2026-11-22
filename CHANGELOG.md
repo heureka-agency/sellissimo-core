@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0
+
+- Highlight featured products and show best sellers ranked by retained paid units. Both lists have Antlers tags. Merchants can enable hand-picked or automatic cross-sells and upgrades per site.
+- Edit product descriptions in Bard with headings, links and inline product images. Product detail responses include rendered HTML. CSV and ZIP exports preserve structured descriptions, images and their alternative text.
+- Search and filter the catalog as the buyer types, keep the filter form in place, and restore results when navigating browser history. Product quantity sits beside Add to cart. Cart quantity edits update totals automatically. Standard forms remain available.
+- Apply and remove coupons and gift vouchers in the checkout order summary. Delivery and payment choices use radio cards. Configure separate terms, privacy and newsletter controls and a payment-obligation label per site. Each new order records the choices and policy version shown to the buyer.
+
+Run `php please sellissimo:install` after updating. The migration updates the catalog index and imports recommendation defaults you explicitly configured. Review published theme overrides and adapt custom checkouts before requiring policy acceptance. [Upgrade notes](README.md#upgrading-to-110)
+
 ## 1.0.1
 
 - Store Settings sections can link directly to an addon's own editor. Existing section bookmarks take authorized staff to the editor for their selected site.

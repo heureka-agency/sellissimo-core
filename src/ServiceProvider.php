@@ -4,6 +4,17 @@ namespace Sellissimo\Core;
 
 use Illuminate\Auth\Events\Login;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Database\Events\TransactionCommitted;
+use Illuminate\Database\Events\TransactionRolledBack;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
+use Statamic\Events\CollectionSaved;
+use Statamic\Events\EntryDeleted;
+use Statamic\Events\EntrySaved;
+use Statamic\Events\EntrySaving;
+use Statamic\Events\TermDeleted;
+use Statamic\Events\TermSaved;
 use Statamic\Facades\CP\Nav;
 use Statamic\Providers\AddonServiceProvider;
 
@@ -52,14 +63,38 @@ class ServiceProvider extends AddonServiceProvider
     public function bootAddon()
     {
         $this->app['events']->listen([
-            \Illuminate\Database\Events\TransactionBeginning::class,
-            \Illuminate\Database\Events\TransactionCommitted::class,
-            \Illuminate\Database\Events\TransactionRolledBack::class,
+            TransactionBeginning::class,
+            TransactionCommitted::class,
+            TransactionRolledBack::class,
         ], StoreSettings::transactionChanged(...));
         $this->loadJsonTranslationsFrom(__DIR__.'/../resources/lang');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'sellissimo');
         $this->publishes([__DIR__.'/../resources/lang' => lang_path('vendor/sellissimo')], 'sellissimo-translations');
         $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        View::composer('sellissimo::shop-merchandising', function ($view) {
+            $merchandising = app(Merchandising::class);
+            $site = $view->getData()['site'];
+            $view->with(['featuredProducts' => $merchandising->featured($site), 'popularProducts' => $merchandising->popular($site)]);
+        });
+        View::composer('sellissimo::product-merchandising', function ($view) {
+            $merchandising = app(Merchandising::class);
+            ['site' => $site, 'product' => $product] = $view->getData();
+            if (! array_intersect(['cross_sell', 'upsell'], StoreFeatures::get($site)['features'])) {
+                $view->with(['upsellProducts' => [], 'crossSellProducts' => []]);
+
+                return;
+            }
+            $excluded = $merchandising->cartEntryIds($site);
+            $upgrades = $merchandising->recommend($site, 'upsell', [$product['sku']], excludeIds: $excluded);
+            $view->with([
+                'upsellProducts' => $upgrades,
+                'crossSellProducts' => $merchandising->recommend($site, 'cross_sell', [$product['sku']], excludeIds: [...$excluded, ...array_column($upgrades, 'entry_id')]),
+            ]);
+        });
+        View::composer('sellissimo::cart-merchandising', function ($view) {
+            ['site' => $site, 'receipt' => $receipt] = $view->getData();
+            $view->with('crossSellProducts', app(Merchandising::class)->recommend($site, 'cross_sell', array_column($receipt['lines'] ?? [], 'sku')));
+        });
         $this->publishes([__DIR__.'/../config/sellissimo.php' => config_path('sellissimo.php')], 'sellissimo-config');
         $excluded = config('statamic.static_caching.exclude.urls', []);
         $excluded[] = '/api/sellissimo/*';
@@ -92,22 +127,22 @@ class ServiceProvider extends AddonServiceProvider
                 }
             }
         });
-        $this->app['events']->listen(\Statamic\Events\EntrySaving::class, [Catalog::class, 'validateEntry']);
-        foreach ([\Statamic\Events\EntrySaved::class, \Statamic\Events\EntryDeleted::class] as $event) {
+        $this->app['events']->listen(EntrySaving::class, [Catalog::class, 'validateEntry']);
+        foreach ([EntrySaved::class, EntryDeleted::class] as $event) {
             $this->app['events']->listen($event, [Catalog::class, 'refreshEntry']);
         }
-        foreach ([\Statamic\Events\TermSaved::class, \Statamic\Events\TermDeleted::class, \Statamic\Events\CollectionSaved::class] as $event) {
+        foreach ([TermSaved::class, TermDeleted::class, CollectionSaved::class] as $event) {
             $this->app['events']->listen($event, function () {
                 app(CatalogBrowse::class)->invalidate();
             });
         }
         Search\StoreRecords::register();
         \Statamic\Facades\Search::addCpSearchable(Search\StoreRecords::class);
-        \Illuminate\Support\Facades\Gate::policy(Search\StoreRecord::class, Search\StoreRecordPolicy::class);
+        Gate::policy(Search\StoreRecord::class, Search\StoreRecordPolicy::class);
         StaffAccess::register();
         app(SettingsRegistry::class)->registerCoreLinks();
         $widgets = config('statamic.cp.widgets', []);
-        if (config('sellissimo.activity_widget', true) && !collect($widgets)->contains(fn ($widget) => ($widget['type'] ?? null) === 'sellissimo_activity')) {
+        if (config('sellissimo.activity_widget', true) && ! collect($widgets)->contains(fn ($widget) => ($widget['type'] ?? null) === 'sellissimo_activity')) {
             config(['statamic.cp.widgets' => [...$widgets, ['type' => 'sellissimo_activity', 'width' => 100]]]);
         }
         Nav::extend(StoreNavigation::build(...));

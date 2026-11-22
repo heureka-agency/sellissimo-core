@@ -12,6 +12,7 @@ use Statamic\Facades\Site;
 class CatalogImport
 {
     public const MAX_BYTES = 2097152;
+
     public const MAX_ROWS = 2000;
 
     public static function spreadsheetCell(string $value): string
@@ -19,7 +20,7 @@ class CatalogImport
         return preg_match("/^(?:[\\s]*[=+@-]|['\\t\\r\\n])/", $value) || $value === '__CLEAR__' ? "'".$value : $value;
     }
 
-    public const COLUMNS = ['sku', 'product_handle', 'variant', 'title', 'price', 'sale_price', 'cost', 'barcode', 'mpn', 'summary', 'description', 'brand', 'product_type', 'published', 'service', 'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'sale_starts', 'sale_ends', 'unit', 'unit_quantity', 'country_of_origin', 'hs_code', 'featured', 'seo_title', 'seo_description', 'categories', 'tags', 'gallery', 'variant_image', 'attributes', 'stock'];
+    public const COLUMNS = ['sku', 'product_handle', 'variant', 'title', 'price', 'sale_price', 'cost', 'barcode', 'mpn', 'summary', 'description', 'brand', 'product_type', 'published', 'service', 'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'sale_starts', 'sale_ends', 'unit', 'unit_quantity', 'country_of_origin', 'hs_code', 'featured', 'seo_title', 'seo_description', 'categories', 'tags', 'gallery', 'variant_image', 'attributes', 'stock', 'description_bard'];
 
     private function invalid(string $message): never
     {
@@ -52,7 +53,7 @@ class CatalogImport
                 }
                 yield array_map('trim', array_combine($header, $values));
             }
-            if (!$count) {
+            if (! $count) {
                 $this->invalid('Add at least one product row.');
             }
 
@@ -140,17 +141,18 @@ class CatalogImport
                 if ($existingSku && isset($row['product_handle'], $row['seo_description'])) {
                     $currentVariant = $index === null ? null : $entry->value('sellissimo_variants')[$index];
                     $current = CatalogExport::row($entry, $currentVariant, $currency);
-                    $changes = array_filter($row, fn ($v, $k) => !in_array($k, ['sku','product_handle'], true) && $v !== '' && $v !== self::spreadsheetCell($current[$k]), ARRAY_FILTER_USE_BOTH);
+                    $changes = array_filter($row, fn ($v, $k) => ! in_array($k, ['sku', 'product_handle'], true) && $v !== '' && $v !== self::spreadsheetCell($current[$k]), ARRAY_FILTER_USE_BOTH);
                     if ($images) {
                         // Detect conflicting archive images even when the entry already references their paths.
-                        foreach (['gallery', 'variant_image'] as $column) {
+                        foreach (['gallery', 'variant_image', 'description_bard'] as $column) {
                             if (($row[$column] ?? '') !== '') {
                                 $changes[$column] = $row[$column];
                             }
                         }
                     }
-                    if (!$changes && $stockCell === '') {
+                    if (! $changes && $stockCell === '') {
                         $rows[] = ['number' => $number, 'sku' => $sku, 'action' => 'Unchanged'];
+
                         continue;
                     }
                     // Apply only edited cells so inherited values stay linked to their origin.
@@ -177,6 +179,12 @@ class CatalogImport
                 $isVariant = $index !== null || $variant !== '';
                 if ($isVariant && ! $existingSku && blank($row['product_handle'] ?? null)) {
                     $this->invalid('New variants require a shared product_handle.');
+                }
+                $hasMarkdown = ($row['description'] ?? '') !== '';
+                $hasBard = ($row['description_bard'] ?? '') !== '';
+                if (($hasMarkdown && $hasBard) || ($hasMarkdown && isset($shared[$slug]['description_bard'])) ||
+                    ($hasBard && isset($shared[$slug]['description']))) {
+                    $this->invalid('Choose either description (Markdown) or description_bard (Bard JSON) per product.');
                 }
                 $previousData = $data;
                 $wasPublished = $group['published'];
@@ -255,12 +263,12 @@ class CatalogImport
                 }
                 $resources = $group['resources'] ?? [];
                 $newResources = [];
-                foreach (['categories', 'tags', 'gallery', 'attributes', 'variant_image'] as $column) {
+                foreach (['categories', 'tags', 'gallery', 'attributes', 'variant_image', 'description_bard'] as $column) {
                     if (($cell = $row[$column] ?? '') === '') {
                         continue;
                     }
-                    $isProductField = in_array($column, ['categories', 'tags', 'gallery'], true);
-                    if (!$isProductField && !$isVariant) {
+                    $isProductField = in_array($column, ['categories', 'tags', 'gallery', 'description_bard'], true);
+                    if (! $isProductField && ! $isVariant) {
                         $this->invalid("$column requires a variant row.");
                     }
                     $value = $this->structuredValue($column, $cell);
@@ -281,8 +289,9 @@ class CatalogImport
                             }
                         }
                     }
-                    if (in_array($column, ['gallery', 'variant_image'], true)) {
-                        foreach ((array) $value as $path) {
+                    if (in_array($column, ['gallery', 'variant_image', 'description_bard'], true)) {
+                        $paths = $column === 'description_bard' ? ProductDescription::images($value ?? []) : (array) $value;
+                        foreach ($paths as $path) {
                             $staged = $images[$path] ?? null;
                             $new = $media->image($path, $staged, $user);
                             $resourceKey = 'image:'.$path;
@@ -293,9 +302,10 @@ class CatalogImport
                         }
                     }
                     if ($isProductField) {
-                        $data['sellissimo_'.$column] = $value;
-                        if (!$isVariant) {
-                            $target['sellissimo_'.$column] = $value;
+                        $field = $column === 'description_bard' ? 'sellissimo_description' : 'sellissimo_'.$column;
+                        $data[$field] = $value;
+                        if (! $isVariant) {
+                            $target[$field] = $value;
                         }
                     } else {
                         $target[$column === 'attributes' ? 'attributes' : 'image'] = $value;
@@ -305,7 +315,7 @@ class CatalogImport
                 $group['skus'][] = $sku;
                 $stockChanged = false;
                 if ($stockCell !== '') {
-                    if (!$user->can('manage sellissimo inventory')) {
+                    if (! $user->can('manage sellissimo inventory')) {
                         $this->invalid('Inventory permission is required to import warehouse stock.');
                     }
                     if (($data['sellissimo_service'] ?? $entry?->value('sellissimo_service')) || filled($target[$prefix.'download'] ?? null)
@@ -317,7 +327,7 @@ class CatalogImport
                     $total = app(Store::class)->table('stock')->where('sku', $sku)->value('available');
                     $balances = $inventory->balances($sku, (int) $total);
                     foreach ($counts as $location => $qty) {
-                        if (!in_array($location, $locations, true)) {
+                        if (! in_array($location, $locations, true)) {
                             $this->invalid("Unknown warehouse $location.");
                         }
                         $previous = $balances[$location] ?? 0;
@@ -351,7 +361,7 @@ class CatalogImport
                 }
                 $group['data'] = $data;
                 $groups[$slug] = $group;
-                $action = ! $existingSku ? ($isVariant ? 'Create variant' : 'Create product') : ($previousData === $data && !$stockChanged && $wasPublished === $group['published'] ? 'Unchanged' : 'Update');
+                $action = ! $existingSku ? ($isVariant ? 'Create variant' : 'Create product') : ($previousData === $data && ! $stockChanged && $wasPublished === $group['published'] ? 'Unchanged' : 'Update');
                 $rows[] = compact('number', 'sku', 'action') + ['resources' => array_keys($newResources),
                     'stock' => $group['counts'][$sku] ?? []];
             } catch (ValidationException $e) {
@@ -371,22 +381,32 @@ class CatalogImport
         if ($column === 'variant_image') {
             return CatalogImportMedia::path($cell);
         }
+        if ($column === 'description_bard') {
+            $document = json_decode($cell, true, 64);
+            if (! is_array($document) || ! str_starts_with(ltrim($cell), '[')) {
+                $this->invalid('Enter a Bard JSON list in description_bard.');
+            }
+
+            return $document;
+        }
         $decoded = json_decode($cell);
         if (in_array($column, ['attributes', 'stock'], true)) {
-            if (!is_object($decoded) || count((array) $decoded) > 100) {
+            if (! is_object($decoded) || count((array) $decoded) > 100) {
                 $this->invalid("Enter a JSON object for $column.");
             }
             foreach ((array) $decoded as $key => $value) {
-                if (blank($key) || strlen($key) > 100 || ($column === 'stock' ? !is_int($value) || $value < 0 || $value > 999999999 : !is_string($value) || blank($value) || mb_strlen($value) > 200)) {
+                if (blank($key) || strlen($key) > 100 || ($column === 'stock' ? ! is_int($value) || $value < 0 || $value > 999999999 : ! is_string($value) || blank($value) || mb_strlen($value) > 200)) {
                     $this->invalid("Invalid key or value in $column.");
                 }
             }
+
             return (array) $decoded;
         }
-        if (!is_array($decoded) || count($decoded) > ($column === 'gallery' ? 16 : 100)
-            || array_filter($decoded, fn ($value) => !is_string($value) || blank($value)) || count(array_unique($decoded)) !== count($decoded)) {
+        if (! is_array($decoded) || count($decoded) > ($column === 'gallery' ? 16 : 100)
+            || array_filter($decoded, fn ($value) => ! is_string($value) || blank($value)) || count(array_unique($decoded)) !== count($decoded)) {
             $this->invalid("Enter a JSON list of distinct values for $column.");
         }
+
         return $decoded;
     }
 

@@ -63,6 +63,52 @@ For a headless storefront, the cart quote response includes `checkout_step_defin
 
 The [local pickup example](../examples/local-pickup/src/ServiceProvider.php) registers the shipping method and its conditional time-window step. Enable `pickup` in `shipping` and include `pickup_window` in `checkout_steps` to try them together.
 
+## Checkout policies and newsletter opt-in
+
+Open **Store → Settings → Checkout and customers** for the active site. Publish the relevant Statamic entries before selecting them as the terms or privacy page. The following keys can also supply inherited defaults under `sellissimo.checkout_policy.<site>`.
+
+| Key | Effect |
+| --- | --- |
+| `terms_page` + `require_terms` | Select the terms entry by ID and require a distinct acceptance. |
+| `privacy_page` + `require_privacy` | Select the privacy notice entry by ID and require acknowledgement. |
+| `offer_newsletter` | Offer an optional, initially unchecked subscription. The buyer can complete checkout with it unchecked. Cart recovery has a separate consent field. |
+| `payment_obligation` | Use explicit payment-obligation wording on the final button for a positive order total. A zero-total order retains its free-order label. |
+| `payment_notice` | Optional text shown near the final button for a positive order total. |
+
+The four switches default to false. A selected entry can also serve as an informational link with its required switch off. A missing or unpublished required document prevents checkout on that site.
+
+**Custom checkouts.** The JSON quote and `sellissimo:cart` expose `checkout_policy`. Read `fields`, `available`, `version`, `payment_obligation` and `payment_notice`. For each enabled field, display its localized `label` and `required` state. Required fields include a `document` with `id`, `url`, `title` and a content version. Show buyers the linked document before asking them to confirm.
+
+Send the current policy version when submitting a mandatory choice or an affirmative newsletter opt-in. For example, add these keys to the normal JSON checkout payload, substituting the values from the reviewed quote.
+
+```json
+{
+  "consents": {"terms": true, "privacy": true, "newsletter": false},
+  "policy_version": "<checkout_policy.version>",
+  "quote_token": "<quote_token>"
+}
+```
+
+Ordinary forms submit `consents[terms]`, `consents[privacy]` and `consents[newsletter]` as appropriate for the site. The Antlers `sellissimo:checkout` form tag supplies the hidden version and quote token. Custom forms still need to display the policy fields. If checkout returns HTTP 422 for a missing consent or changed policy, show the field error, refresh the quote and ask for the buyer's current choices. The server also validates policies on signed draft purchase links.
+
+**Newsletter integration.** Each placed order's stored receipt includes `checkout_consents` for the controls offered. Each entry records `accepted`, `recorded_at`, the localized label and the policy version. For required documents the snapshot also stores the entry ID, URL, title, document version and content as purchased. An unchecked newsletter is recorded as false. Historical orders keep their original receipts.
+
+To connect a mailing provider, listen for the after-commit Laravel event `sellissimo.order.placed`. Its single array argument holds `order_id`, `gateway` and `payment_status`. Use the order ID to read the saved receipt. Queue a subscription only when `checkout_consents.newsletter.accepted` is true, using the order ID to deduplicate retries. The provider connection, delivery and unsubscribe handling belong to the integration.
+
+## Coupons, gift vouchers and method cards
+
+The bundled checkout keeps code entry in the order summary across steps. For a custom version of this session-based form, POST to `/{prefix}/cart/{cart}/checkout-codes/{step}` (route `sellissimo.checkout.codes`). Use the current buyer's cart, an enabled checkout step and the session CSRF token.
+
+| Action | Fields |
+| --- | --- |
+| Apply | `code_action=apply`, `coupon_code` and optionally `voucher_code` (up to 80 characters each). Send the current coupon when applying only a voucher to retain both. A blank coupon clears the discount. A blank voucher leaves the current voucher in place. |
+| Remove a coupon | `code_action=remove_discount` |
+| Remove a voucher | `code_action=remove_voucher` |
+
+With `Accept: application/json`, success returns `{"url":"…"}` for the current step. GET that URL to refresh the priced summary, eligible delivery and payment methods, and any required extension fields. A rejected code returns HTTP 422 with field errors. A standard form post redirects to the step. Headless clients use the v1 cart quote and checkout endpoints with their existing `discount` and `voucher` fields and review the updated quote token. [Cart API](storefront.md#json-api-v1)
+
+The checkout renders eligible shipping options and payment gateways as labeled radio cards. Shipping cards display the quoted amount. To customize the supporting text, set `sellissimo.checkout_method_descriptions.<site>` with `shipping` and `gateway` maps keyed by the exact option handle returned by the quote. For example, use `'gateway' => ['pay_on_delivery' => 'Pay when collecting your order.']` for a store that offers collection.
+
 ## Cart and customer unit prices
 
 A `Sellissimo\Core\Contracts\UnitPriceProvider` can set a catalog item's base unit price before discount allocation, tax calculations and shipping quotes. Register the provider in the addon's service provider and enable its handle in the store config.

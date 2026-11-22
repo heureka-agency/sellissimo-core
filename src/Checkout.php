@@ -19,7 +19,8 @@ class Checkout
             if ($existing = $this->store->table('orders')->where('cart_id', $cart->id)->first()) {
                 return $existing;
             }
-            abort_if($customer === null && !StoreSettings::forSection($cart->site, 'checkout', 'guest_checkout', config('sellissimo.guest_checkout', true)), 401, __('Sign in before placing an order.'));
+            abort_if($customer === null && ! StoreSettings::forSection($cart->site, 'checkout', 'guest_checkout', config('sellissimo.guest_checkout', true)), 401, __('Sign in before placing an order.'));
+            $consents = CheckoutPolicy::snapshot($cart->site, $input);
             $cart->customer = $customer;
             $receipt = $this->pricing->calculate($cart, $input, true, placingOrder: true);
             if (($cart->retry_order_id ?? null) || ($cart->currency_review ?? false)) {
@@ -64,6 +65,9 @@ class Checkout
             if ($identity = StoreIdentity::snapshot($cart->site)) {
                 $receipt['store_identity'] = $identity;
             }
+            if ($consents) {
+                $receipt['checkout_consents'] = $consents;
+            }
             $receipt['access_days'] = (int) StoreSettings::forSection($cart->site, 'orders', 'access_days', config('sellissimo.access_days', 7));
             $receipt['return_url'] = URL::temporarySignedRoute('sellissimo.receipt', now()->addDay(), ['order' => $id]);
             $this->store->table('orders')->insert([
@@ -83,6 +87,7 @@ class Checkout
             app(Webhooks::class)->activity('order.placed', $id, ['gateway' => $gateway, 'payment_status' => $order->status], $order);
             app(OrderQueueFields::class)->refresh($id);
             Search\StoreRecords::changed("order/$id");
+
             return $order;
         }, 3);
 
@@ -146,7 +151,7 @@ class Checkout
         if (! $order->session_id) {
             $this->startSession($order);
             $order = $this->order($id);
-            if ($order->status !== 'pending' || !$order->session_id) {
+            if ($order->status !== 'pending' || ! $order->session_id) {
                 return $order;
             }
         }
@@ -163,7 +168,7 @@ class Checkout
             if ($order->status === $status) {
                 return $order;
             }
-            abort_unless($order->status === 'awaiting_collection' && ($collect || (!$order->tracking && !app(CarrierLabels::class)->active($id))), 409, 'Only unshipped, unpaid orders can be cancelled.');
+            abort_unless($order->status === 'awaiting_collection' && ($collect || (! $order->tracking && ! app(CarrierLabels::class)->active($id))), 409, 'Only unshipped, unpaid orders can be cancelled.');
             $this->store->table('orders')->where('id', $id)->update(['status' => 'pending']);
 
             return $this->applyOutcome($id, ['status' => $status, 'amount' => (int) GiftVouchers::cashPayment($order)->total, 'currency' => $order->currency, 'reference' => $collect ? 'pay_on_delivery' : null]);
@@ -177,8 +182,8 @@ class Checkout
             if ($order->status !== 'pending' || $result['status'] === 'pending') {
                 return $order;
             }
-            $rejected = !empty($result['request_rejected']);
-            if ($rejected && !PaymentSessions::canReleaseRejected($order)) {
+            $rejected = ! empty($result['request_rejected']);
+            if ($rejected && ! PaymentSessions::canReleaseRejected($order)) {
                 return $order;
             }
             if ($result['status'] === 'expired') {
@@ -187,7 +192,7 @@ class Checkout
                 }
                 $physical = collect(json_decode($order->receipt, true)['lines'])->filter(fn ($line) => Inventory::tracked($line))->groupBy('sku')->sortKeys();
                 foreach ($physical as $sku => $lines) {
-                    app(Inventory::class)->release($id, (string)$sku, $lines->sum('qty'));
+                    app(Inventory::class)->release($id, (string) $sku, $lines->sum('qty'));
                 }
             } else {
                 throw_unless($result['status'] === 'paid' && (int) GiftVouchers::cashPayment($order)->total === $result['amount'] && $order->currency === $result['currency'], 'Payment does not match order.');
@@ -206,12 +211,13 @@ class Checkout
             }
 
             Search\StoreRecords::changed("order/$id");
+
             return $this->order($id);
         }, 3);
     }
 
     public static function link(object $order): string
     {
-        return OrderLinks::signed($order, 'sellissimo.receipt', now()->addDays(\Sellissimo\Core\OperationalSettings::accessDays($order)), ['order' => $order->id]);
+        return OrderLinks::signed($order, 'sellissimo.receipt', now()->addDays(OperationalSettings::accessDays($order)), ['order' => $order->id]);
     }
 }

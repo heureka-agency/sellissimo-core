@@ -3,6 +3,7 @@
 namespace Sellissimo\Core;
 
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 use Statamic\Facades\Entry;
 use Statamic\Facades\Stache;
 use Statamic\Stache\Repositories\EntryRepository;
@@ -19,16 +20,17 @@ class CatalogBrowse
     public static function filters(array $input): array
     {
         $filters = validator($input, ['q' => 'nullable|string|max:150', 'category' => 'nullable|string|max:150',
-            'in_stock' => 'nullable|boolean', 'price_min' => 'nullable|string|max:20', 'price_max' => 'nullable|string|max:20',
+            'in_stock' => 'nullable|boolean', 'featured' => 'nullable|boolean', 'price_min' => 'nullable|string|max:20', 'price_max' => 'nullable|string|max:20',
             'attributes' => 'nullable|array|max:24', 'attributes.*' => 'nullable|string|max:150', 'sort' => 'nullable|in:price_asc,price_desc',
             'per_page' => 'sometimes|integer|min:1|max:100', 'page' => 'sometimes|integer|min:1|max:1000000'])->validate();
         if (isset($filters['attributes'])) {
             $filters['attributes'] = array_filter($filters['attributes'], fn ($value) => filled($value));
         }
+
         return array_filter($filters, fn ($value) => filled($value));
     }
 
-    public function page(string $site, array $filters, bool $picker = false, bool $groupProducts = false): array
+    public function state(string $site): object
     {
         $currency = $this->catalog->currency($site);
         $versions = [$currency, Catalog::collections(), StoreFeatures::enabled($site, 'vouchers')];
@@ -87,7 +89,18 @@ class CatalogBrowse
                 return $pages->first();
             }, 3);
         }
+
+        return $state;
+    }
+
+    public function page(string $site, array $filters, bool $picker = false, bool $groupProducts = false): array
+    {
+        $state = $this->state($site);
+        $currency = $this->catalog->currency($site);
         $query = $this->store->table('catalog_listings')->where('site', $site);
+        if (! empty($filters['featured'])) {
+            $query->where('featured', true);
+        }
         if (filled($filters['q'] ?? null)) {
             $term = strtr(mb_strtolower(trim($filters['q'])), ['!' => '!!', '%' => '!%', '_' => '!_']);
             $query->whereRaw("words like ? escape '!'", ['%'.$term.'%']);
@@ -95,7 +108,7 @@ class CatalogBrowse
         if (filled($filters['category'] ?? null)) {
             $query->whereJsonContains('categories', $filters['category']);
         }
-        if (!empty($filters['in_stock'])) {
+        if (! empty($filters['in_stock'])) {
             $inStock = $this->store->table('stock')->where('available', '>', 0)->select('sku');
             $query->where(fn ($q) => $q->where('tracked', false)->orWhereIn('sku', $inStock));
         }
@@ -108,7 +121,7 @@ class CatalogBrowse
             }
         }
         if (isset($bounds['price_min'], $bounds['price_max']) && $bounds['price_min'] > $bounds['price_max']) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['price_max' => __('sellissimo::shop.price_bounds')]);
+            throw ValidationException::withMessages(['price_max' => __('sellissimo::shop.price_bounds')]);
         }
         foreach ($filters['attributes'] ?? [] as $name => $value) {
             if (filled($value)) {
@@ -141,7 +154,7 @@ class CatalogBrowse
         if ($groupProducts) {
             $families = collect($items)->groupBy('entry_id');
             foreach ($byPosition as $position => $sku) {
-                if (!isset($items[$sku])) {
+                if (! isset($items[$sku])) {
                     continue;
                 }
                 $family = $families[$items[$sku]['entry_id']];

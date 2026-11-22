@@ -3,7 +3,15 @@ fields:
   - handle: sellissimo_summary
     field: { type: textarea, display: Short description, rows: 2, localizable: true, character_limit: 320, validate: ['nullable', 'string', 'max:320'] }
   - handle: sellissimo_description
-    field: { type: markdown, display: Description, localizable: true }
+    field:
+      type: sellissimo_description
+      display: Description
+      localizable: true
+      container: sellissimo_products
+      buttons: [h2, h3, bold, italic, unorderedlist, orderedlist, quote, anchor, image, removeformat]
+      link_noopener: true
+      save_html: false
+      instructions: 'Insert product images between paragraphs. Set alternative text on each image in the product image container.'
   - handle: sellissimo_gallery
     field: { type: assets, display: Product images, container: sellissimo_products, mode: grid, max_files: 16, restrict: true, validate: ['mimes:jpg,jpeg,png,webp,gif,avif'], instructions: 'The first image is the cover. Set alternative text on each asset.' }
   - handle: sellissimo_brand

@@ -21,6 +21,7 @@ Route::middleware([StorefrontAvailability::class, PrivateResponse::class, 'throt
             Route::post('cart/{cart}/currency', [ShopController::class, 'rebuild'])->whereUuid('cart')->name('sellissimo.cart.currency');
             Route::post('cart/{cart}/items', [ShopController::class, 'item'])->whereUuid('cart')->name('sellissimo.item');
             Route::post('cart/{cart}/quote', [ShopController::class, 'quote'])->whereUuid('cart')->name('sellissimo.quote');
+            Route::post('cart/{cart}/checkout-codes/{step}', [ShopController::class, 'checkoutCodes'])->whereUuid('cart')->where('step', '[a-z][a-z0-9_]*')->name('sellissimo.checkout.codes');
             Route::post('cart/{cart}/billing-fields', [ShopController::class, 'digitalBilling'])->whereUuid('cart')->name('sellissimo.billing.fields');
             Route::post('cart/{cart}/checkout', [ShopController::class, 'checkout'])->whereUuid('cart')->name('sellissimo.checkout');
         });
