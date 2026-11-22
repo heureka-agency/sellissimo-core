@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'product_image_viewer' => 'Visionneuse des photos du produit',
+    'open_product_image' => 'Ouvrir la photo :number, :description',
+    'zoom_product_image' => 'Zoom',
+    'close_image_viewer' => 'Fermer la visionneuse',
+    'previous_product_image' => 'Photo précédente',
+    'next_product_image' => 'Photo suivante',
     'consent_terms' => 'J’accepte les conditions générales de vente.',
     'consent_privacy' => 'J’ai pris connaissance de la politique de confidentialité.',
     'consent_newsletter' => 'Je souhaite recevoir la newsletter de la boutique par e-mail.',

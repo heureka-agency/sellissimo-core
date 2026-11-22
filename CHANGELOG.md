@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Hover over a product photo to inspect a detail, or tap or click to open a full-screen gallery. The viewer supports touch panning, zoom, keyboard navigation and returning focus to the selected photo. Hover zoom and the lightbox can each be turned off. [Gallery settings](docs/storefront.md#product-image-gallery)
+- Keep the quantity field and Add to cart button side by side on mobile and desktop. [Published theme upgrade notes](README.md#upgrading-to-120)
+
 ## 1.1.0
 
 - Highlight featured products and show best sellers ranked by retained paid units. Both lists have Antlers tags. Merchants can enable hand-picked or automatic cross-sells and upgrades per site.

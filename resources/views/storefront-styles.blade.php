@@ -165,9 +165,8 @@
 .ss-store .product-price { font-size: 1.4rem; }
 .ss-store .product-variants { display: flex; flex-wrap: wrap; gap: .45rem; }
 .ss-store .product-variants a[aria-current] { border-color: var(--ss-accent); color: var(--ss-accent-text); background: var(--ss-accent); }
-.ss-store .product-buy-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .75rem; }
-.ss-store .product-buy-actions label, .ss-store .product-buy-actions .field-error { flex-basis: 100%; }
-.ss-store .product-buy-actions input[type="number"] { width: 4.75rem; max-width: 100%; }
+.ss-store .product-buy-actions { display: grid; grid-template-columns: minmax(0,4.75rem) minmax(0,1fr); align-items: end; gap: .35rem .75rem; }
+.ss-store .product-buy-actions label, .ss-store .product-buy-actions .field-error { grid-column: 1/-1; }
 .ss-store .product-buy { max-width: 34rem; margin-block: 1rem; }
 .ss-store .product-specs { display: grid; grid-template-columns: minmax(0,max-content) minmax(0,1fr); gap: .6rem 1rem; }
 .ss-store .product-specs dd { margin: 0; }

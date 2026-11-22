@@ -27,13 +27,28 @@ The catalog, product pages, cart, checkout and signed buyer pages share a Blade 
 
 For a brand adjustment, add a style after the bundled defaults using the layout’s `head` stack, or override `resources/views/vendor/sellissimo/storefront-styles.blade.php`. The stylesheet is scoped to `.ss-store`. Set `--ss-font`, `--ss-accent`, `--ss-accent-text`, `--ss-canvas`, `--ss-surface`, `--ss-border`, and `--ss-focus` to match your site. Choose an accent and text color that remain legible together. Set the trading name in **Store → Settings → Store details and currency**. Custom Antlers storefronts can continue using the existing form tags and JSON API.
 
+### Product image gallery
+
+The bundled product page displays the active variant's image first, followed by the product gallery in the editor's order. On a device with a mouse, hovering over a photo magnifies the area under the pointer. Clicking or tapping any photo opens the full-screen viewer. Select **Zoom** to enlarge the picture, then drag or scroll to inspect it. Touch users can pan with one finger. Select **Zoom** again to fit the picture to the screen.
+
+Use the previous and next buttons to move between photos. The left and right arrow keys also switch photos while the image is fitted to the screen. Close the viewer with its close button or Escape to return focus to the original photo. Without JavaScript the photos link directly to their image files.
+
+The lightbox and hover zoom are enabled independently by default. Set either environment variable to `false` to turn off that feature, then rebuild your configuration cache if your deployment uses one.
+
+| Environment variable | Key in `config/sellissimo.php` |
+| --- | --- |
+| `SELLISSIMO_PRODUCT_LIGHTBOX` | `product_gallery.lightbox` |
+| `SELLISSIMO_PRODUCT_HOVER_ZOOM` | `product_gallery.hover_zoom` |
+
+If your theme overrides the product view, replace its gallery loop with `@include('sellissimo::product-gallery', ['images' => $product['images']])` inside the bundled product template. Custom Blade layouts should render `@stack('head')` and keep the gallery inside `.ss-store`.
+
 ### Catalog filters and automatic cart updates
 
 The bundled filter form updates results when a buyer changes a selection or pauses while typing. It updates the query string so buyers can bookmark a search or use Back and Forward. The advanced filters remain in place while results change. Keep the ordinary GET form and pagination links when overriding the view.
 
 For an HTML refresh, GET `/{prefix}` (route `sellissimo.shop`) with the catalog query parameters and `X-Sellissimo-Fragment: catalog`. The response contains the `[data-catalog-results]` element with active filters, count, results and pagination. The bundled `catalog-filters`, `catalog-response` and `catalog-interactions` views share this contract. The JSON catalog endpoint below is available for clients rendering their own list.
 
-On the product page, the quantity input and Add to cart action share a form. In the cart, changing a line quantity automatically refreshes totals and the header count. The script serializes changes before proceeding to checkout. A buyer using ordinary forms can submit the quantity or remove a line. For the same response in a custom theme, POST the session cart's SKU, absolute `quantity` (0–999) and CSRF token to `/{prefix}/cart/{cart}/items` (route `sellissimo.item`). Preserve the `line_key` when editing a personalized line. With `Accept: application/json`, the response contains `html` for the cart content and `cart_label` for the header. The v1 API's separate PUT endpoint returns HTTP 204.
+On the product page, the quantity input and Add to cart button sit side by side on desktop and mobile. In the cart, changing a line quantity automatically refreshes totals and the header count. The script serializes changes before proceeding to checkout. A buyer using ordinary forms can submit the quantity or remove a line. For the same response in a custom theme, POST the session cart's SKU, absolute `quantity` (0–999) and CSRF token to `/{prefix}/cart/{cart}/items` (route `sellissimo.item`). Preserve the `line_key` when editing a personalized line. With `Accept: application/json`, the response contains `html` for the cart content and `cart_label` for the header. The v1 API's separate PUT endpoint returns HTTP 204.
 
 ### Trust information and site-wide search
 

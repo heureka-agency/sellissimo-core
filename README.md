@@ -119,6 +119,10 @@ Upgrade the package versions with Composer, then run `php please sellissimo:inst
 
 See [storefront and API integration](docs/storefront.md) and [extension development](docs/extensions.md).
 
+### Upgrading to 1.2.0
+
+The bundled product page now offers a full-screen photo viewer and pointer hover zoom. Both are enabled by default. Each can be switched off separately. The quantity field and Add to cart button stay side by side on small screens. If you have published your own product view or storefront styles, merge the gallery include and purchase row styles into those overrides. [Product gallery configuration and theme integration](docs/storefront.md#product-image-gallery)
+
 ### Upgrading to 1.1.0
 
 1. Back up the product image container with the rest of the catalog. Update Core and run `php please sellissimo:install`. The migration adds product type and upgrade group to the catalog index and marks listings for rebuild. Existing featured selections and Markdown descriptions continue to work. Saving a description through the new editor writes Bard nodes.

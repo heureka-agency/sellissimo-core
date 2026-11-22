@@ -8,7 +8,7 @@
 @section('content')
 <p class="ss-context"><a href="{{ route('sellissimo.shop', ['site' => $site, ...$filters]) }}">{{ __('sellissimo::shop.back_to_results') }}</a></p>
 <div class="product-layout">
-@if($product['images'])<div class="product-gallery">@foreach($product['images'] as $image)<a href="{{ $image['url'] }}"><img src="{{ $image['url'] }}" alt="{{ $image['alt'] }}" @if(!$loop->first) loading="lazy" @endif></a>@endforeach</div>@endif
+@include('sellissimo::product-gallery', ['images' => $product['images']])
 <div class="product-info ss-panel">
 <h1>{{ $product['product_title'] }}</h1>
 @if($product['brand'] || $product['product_type'])<p>{{ implode(' · ', array_filter([$product['brand'], $product['product_type']])) }}</p>@endif

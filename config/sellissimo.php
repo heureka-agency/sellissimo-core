@@ -8,6 +8,10 @@ return [
     'locked_settings' => [], // Field handles, or site handle => field handles.
     'currencies' => ['default' => 'USD'],
     'storefront' => env('SELLISSIMO_STOREFRONT', false),
+    'product_gallery' => [
+        'lightbox' => env('SELLISSIMO_PRODUCT_LIGHTBOX', true),
+        'hover_zoom' => env('SELLISSIMO_PRODUCT_HOVER_ZOOM', true),
+    ],
     'prefix' => env('SELLISSIMO_PREFIX', 'shop'),
     'activity_widget' => true,
     'default_features' => [],

@@ -1,6 +1,12 @@
 <?php
 
 return [
+    'product_image_viewer' => 'Product image viewer',
+    'open_product_image' => 'View image :number, :description',
+    'zoom_product_image' => 'Zoom',
+    'close_image_viewer' => 'Close image viewer',
+    'previous_product_image' => 'Previous image',
+    'next_product_image' => 'Next image',
     'consent_terms' => 'I accept the terms and conditions.',
     'consent_privacy' => 'I have read the privacy notice.',
     'consent_newsletter' => 'I would like to receive the store newsletter by email.',
