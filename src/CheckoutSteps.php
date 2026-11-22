@@ -21,6 +21,7 @@ class CheckoutSteps
             || end($order) !== 'review' || !in_array('delivery', $order, true)) {
             throw new InvalidArgumentException('Checkout steps must begin with contact, include delivery, and end with review. Use each handle once.');
         }
+        array_splice($order, -1, 0, array_diff($this->providers->beforeReviewSteps(), $order));
         return $order;
     }
 
@@ -100,7 +101,8 @@ class CheckoutSteps
                 $value = $answers[$handle][$key] ?? null;
                 if (filled($value)) {
                     $values[$key] = ['label' => $field['label'], 'value' => $value,
-                        'display' => $field['type'] === 'select' ? $field['options'][$value] : $value];
+                        'display' => $field['type'] === 'select' ? $field['options'][$value] : $value,
+                        ...(($field['private'] ?? false) ? ['private' => true] : [])];
                 }
             }
             if ($values) {
@@ -108,6 +110,27 @@ class CheckoutSteps
             }
         }
         return $snapshots;
+    }
+
+    /** Remove restricted answers before storing the receipt or forwarding it to payment integrations. */
+    public static function takePrivateAnswers(array &$receipt): array
+    {
+        $answers = [];
+        foreach ($receipt['checkout_steps'] ?? [] as $handle => $step) {
+            foreach ($step['fields'] as $key => $field) {
+                if ($field['private'] ?? false) {
+                    $answers[$handle][$key] = $field['value'];
+                    unset($receipt['checkout_steps'][$handle]['fields'][$key]);
+                }
+            }
+            if (!$receipt['checkout_steps'][$handle]['fields']) {
+                unset($receipt['checkout_steps'][$handle]);
+            }
+        }
+        if (empty($receipt['checkout_steps'])) {
+            unset($receipt['checkout_steps']);
+        }
+        return $answers;
     }
 
     public function firstIncomplete(array $definitions, array $receipt, ?string $email, string $target): ?string

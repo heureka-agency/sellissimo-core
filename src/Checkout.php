@@ -34,6 +34,7 @@ class Checkout
             if ($verifyQuote) {
                 $verifyQuote($receipt);
             }
+            $privateAnswers = CheckoutSteps::takePrivateAnswers($receipt);
             $due = $receipt['amount_due'] ?? $receipt['total'];
             $voucher = $receipt['voucher'] ?? null;
             $gateway = $due === 0 ? ($voucher ? 'voucher' : 'free') : $input['gateway'];
@@ -78,6 +79,7 @@ class Checkout
             ]);
 
             $order = $this->order($id);
+            event('sellissimo.order.placement', [$order, $receipt, $privateAnswers]);
             app(Webhooks::class)->activity('order.placed', $id, ['gateway' => $gateway, 'payment_status' => $order->status], $order);
             app(OrderQueueFields::class)->refresh($id);
             Search\StoreRecords::changed("order/$id");

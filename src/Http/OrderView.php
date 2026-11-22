@@ -154,6 +154,7 @@ class OrderView
                 ])->values(),
                 'reason' => Str::headline($row->reason ?? ''), 'respondBy' => $row->respond_by ? Carbon::parse($row->respond_by, 'UTC')->locale(app()->getLocale())->isoFormat('lll').' UTC' : null,
             ]),
+            'extensionPanels' => $providers->orderPanels($order, $receipt, request()->user()),
             'providerDetails' => [
                 'shipping' => $providers->orderDetails('shipping', $carrier, $order, $receipt, request()->user()),
                 'payment' => $providers->orderDetails('payments', $order->gateway, $order, $receipt, request()->user()),

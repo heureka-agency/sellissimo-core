@@ -152,3 +152,17 @@ $instructions = StoreSettings::forSection($site, 'pickup-desk', 'my_pickup_instr
 ```
 
 Core checks section permission, site access, shared scope, hosting locks and revisions before a save. Use provider-specific encrypted storage for credentials. Ordinary setting fields are available to the browser and are intended for merchant preferences.
+
+To open an extension's existing editor directly from the Store Settings overview, pass its CP route name as the optional `route` argument to `section`. For example, use `route: 'my-pickup.settings'` and a fields callback returning `[]` if that editor owns the form. The link includes the selected `site`, and bookmarks to the native section redirect to the same editor. Authorize the site and section permission on the destination route. A section without an available destination uses its native settings form.
+
+## Placement snapshots and order revisions
+
+Register a local listener on `sellissimo.order.placement` to capture immutable extension data. It receives the newly inserted order, the complete receipt, and validated private checkout answers keyed by step and field. It runs once per order inside Sellissimo's commerce transaction. Persist the snapshot on `app(Store::class)->db()`. Defer network calls and other external work until after commit.
+
+Items, selected shipping, and order charges include `tax_class`, `tax_rate` in basis points, and `tax_inclusive`. A missing configured rate is `null`, and an explicitly configured zero rate is `0`. Use the stored line discount, tax, subtotal and total for allocations. The original placement event is independent of the working receipt, which can change after an order amendment.
+
+An extension can include its checkout step before review with `Registry::checkoutStep($handle, $step, beforeReview: true)`. Its `applies` method controls which orders see the step. Set `private => true` on a field to collect its answer for the placement listener. The buyer can review it during checkout. Sellissimo removes it from the placed receipt and payment integration data. `Registry::billingFields($handle, $callback)` accepts a callback taking the billing address, site handle and selling currency and returning the required native address fields. Both features work with the bundled checkout, quote API and draft payment links.
+
+For staff order links, use `Registry::orderPanel($handle, $permission, $callback)`. The callback receives the order, receipt and staff user after the site and permission checks. Return an array with a title, link label and CP route URL under the keys `title`, `label`, `url`, or return `null` to hide the panel. Enforce the same permission and site check on the destination route.
+
+After commit, `sellissimo.order.amended` supplies the order ID and applied amendment ID, including exchange balances. `sellissimo.order.refund_reversed` supplies the order ID and refund ID if the provider reports a previously settled refund as failed. For missed events, inspect `amendments.applied_at` and `refunds.reversed_at` on the commerce connection. Each new parcel records the order's `paid_at_dispatch` boolean under lock. Existing parcels have a null value.

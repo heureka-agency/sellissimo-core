@@ -38,6 +38,7 @@ class OrderCharges
             $tax = $class === null ? 0 : PricingRules::roundedRate($amount, $rates[$class] ?? 0, $inclusive);
             $subtotal = $inclusive ? $amount - $tax : $amount;
             $charges[$handle] = ['label' => trim($label), 'subtotal' => $subtotal, 'tax_class' => $class,
+                'tax_rate' => $rates[$class] ?? null, 'tax_inclusive' => $inclusive,
                 'tax' => $tax, 'total' => $subtotal + $tax];
         }
 

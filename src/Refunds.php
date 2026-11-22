@@ -246,11 +246,12 @@ class Refunds
             // Stripe can report a failed bank transfer days after a refund first succeeded.
             if ($refund->status === 'succeeded' && $status === 'failed') {
                 app(GiftVouchers::class)->restoreFailedPurchaseRefund($order, $refund->id);
-                (clone $refunds)->where('id', $refund->id)->update(['status' => 'failed', 'settled_at' => null, 'notice_pending' => false]);
+                (clone $refunds)->where('id', $refund->id)->update(['status' => 'failed', 'settled_at' => null, 'reversed_at' => now(), 'notice_pending' => false]);
                 if ($order->status === 'refunded') {
                     $this->store->table('orders')->where('id', $order->id)->update(['status' => 'paid']);
                 }
                 $this->store->recordActivity($order->id, 'refund', "Refund $reference failed after settlement. Review the payment before refunding again.");
+                $this->store->db()->afterCommit(fn () => event('sellissimo.order.refund_reversed', [$order->id, $refund->id]));
                 return;
             }
             if ($refund->status === 'pending' && $status !== 'pending') {

@@ -76,6 +76,7 @@ class Fulfillment
             $this->store->table('parcels')->insert(['id' => $id, 'order_id' => $orderId, 'number' => $parcels->count() + 1, 'origin' => $origin, 'tracking' => $input['tracking'],
                 'tracking_url' => $label->tracking_url ?? $input['tracking_url'] ?? null,
                 'items' => json_encode($items, JSON_THROW_ON_ERROR), 'created_at' => now(), 'queued_at' => $queued,
+                'paid_at_dispatch' => $order->status === 'paid',
                 'delivered_at' => null]);
             $this->store->table('orders')->where('id', $orderId)->update(['partially_shipped' => $partial,
                 'tracking' => $input['tracking'], 'delivery_queued_at' => $queued, 'delivery_emailed_at' => null]);

@@ -139,6 +139,10 @@ function toggleDownload(line) {
                 </Card>
                 <Card v-if="order.shippingInstructions"><h2 class="ss-section-title">{{ __('Delivery instructions') }}</h2><p class="ss-body">{{ order.shippingInstructions }}</p></Card>
                 <ProviderDetails :rows="order.providerDetails.shipping" />
+                <Card v-for="(panel, handle) in order.extensionPanels" :key="handle">
+                    <h2 class="ss-section-title">{{ panel.title }}</h2>
+                    <a class="ss-link" :href="panel.url">{{ panel.label }}</a>
+                </Card>
                 <FulfillmentCard ref="fulfillment" v-if="order.lines.some(line => !line.digital)" :order />
                 <Card v-if="order.refunds.length" inset>
                     <h2 class="ss-section-title">

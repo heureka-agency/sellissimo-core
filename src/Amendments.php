@@ -250,7 +250,7 @@ class Amendments
             $this->store->table('orders')->where('id', $order->id)->update(['receipt' => json_encode($after, JSON_THROW_ON_ERROR),
                 'total' => (int) $order->total + max(0, (int) $row->difference)]);
             app(OrderQueueFields::class)->refresh($order->id);
-            $this->store->table('amendments')->where('id', $row->id)->update(['status' => 'applied', 'applied_at' => now()]);
+            $this->markApplied($order->id, $row->id);
             $this->store->recordActivity($order->id, 'return', 'Exchange balance settled. '.$row->reason, $row->author);
             return;
         }
@@ -265,8 +265,14 @@ class Amendments
         $this->store->table('orders')->where('id', $order->id)->update(['receipt' => json_encode($after, JSON_THROW_ON_ERROR),
             'delivery_override' => null, 'total' => (int) $order->total + max(0, (int) $row->difference)]);
         app(OrderQueueFields::class)->refresh($order->id);
-        $this->store->table('amendments')->where('id', $row->id)->update(['status' => 'applied', 'applied_at' => now()]);
+        $this->markApplied($order->id, $row->id);
         $this->store->recordActivity($order->id, 'amendment', 'Order items updated. '.$row->reason, $row->author);
+    }
+
+    private function markApplied(string $order, string $amendment): void
+    {
+        $this->store->table('amendments')->where('id', $amendment)->update(['status' => 'applied', 'applied_at' => now()]);
+        $this->store->db()->afterCommit(fn () => event('sellissimo.order.amended', [$order, $amendment]));
     }
 
     private function changes(array $before, array $after): array

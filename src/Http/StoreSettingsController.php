@@ -38,6 +38,9 @@ class StoreSettingsController
     {
         $site = $this->site($request);
         $current = $this->registry->sections($site)[$section] ?? abort(403);
+        if ($this->registry->destinationRoute($section) !== null) {
+            return redirect()->to($current['url']);
+        }
         $reachable = $status->databaseReachable();
         $fields = $reachable ? $this->registry->fields($section, $site) : [];
         $configs = $values = $sources = [];

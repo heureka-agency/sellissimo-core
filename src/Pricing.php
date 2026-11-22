@@ -62,7 +62,8 @@ class Pricing
         }
         $digitalClasses = array_column(array_filter($lines, fn ($line) => $line['digital']), 'tax_class');
         $billingClasses = $destinationTax ? $digitalClasses : [...$digitalClasses, ...$physicalClasses];
-        $billing = $fields($address, $billingClasses);
+        $billingRequirements = $this->providers->requiredBillingFields($address, $cart->site, $currency);
+        $billing = array_values(array_unique([...$fields($address, $billingClasses), ...$billingRequirements]));
         $deliveryFields = $destinationTax && $physical ? $fields($destination, $physicalClasses) : [];
         if (! $cartPreview && $physical) {
             PostalRegions::address($destination, isset($input['shipping_address']) ? 'shipping_address.region' : 'address.region');
@@ -94,6 +95,8 @@ class Pricing
             $share = array_sum(array_map(fn ($offer) => $offer['allocations'][$line['key']] ?? 0, $offers));
             $rates = $line['digital'] ? $billingRates : $physicalRates;
             $inclusive = in_array($line['tax_class'], $inclusiveClasses, true);
+            $line['tax_rate'] = $rates[$line['tax_class']] ?? null;
+            $line['tax_inclusive'] = $inclusive;
             $line['discount'] = $share;
             $line['tax'] = PricingRules::roundedRate($line['subtotal'] - $share, $rates[$line['tax_class']] ?? 0, $inclusive);
             if ($inclusive) {
@@ -138,6 +141,11 @@ class Pricing
         }
         $method = $input['shipping'] ?? '';
         $shipping = $options[$method] ?? null;
+        if ($shipping !== null) {
+            $shipping['tax_class'] = $shippingClass;
+            $shipping['tax_rate'] = $physicalRates[$shippingClass] ?? null;
+            $shipping['tax_inclusive'] = in_array($shippingClass, $inclusiveClasses, true);
+        }
         abort_if($checkout && ! $lines, 422, __('sellissimo::shop.cart_is_empty'));
         $completeAddress = collect(DeliveryFields::required($destination))->every(fn ($field) => filled($destination[$field] ?? null));
         $deliveryReady = !$physical || ($shipping && $completeAddress);
@@ -162,7 +170,7 @@ class Pricing
             $receipt['total'] += array_sum(array_column($charges, 'total'));
             $classes = array_values(array_unique(array_filter(array_column($charges, 'tax_class'))));
             if (array_diff($classes, $billingClasses)) {
-                $billing = $fields($address, array_values(array_unique([...$billingClasses, ...$classes])));
+                $billing = array_values(array_unique([...$fields($address, array_values(array_unique([...$billingClasses, ...$classes]))), ...$billingRequirements]));
                 $receipt['billing_fields'] = $billing;
                 if (! $cartPreview && in_array('region', $billing, true)) {
                     PostalRegions::address($address, 'address.region');

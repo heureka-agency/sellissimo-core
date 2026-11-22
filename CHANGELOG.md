@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Store Settings sections can link directly to an addon's own editor. Existing section bookmarks take authorized staff to the editor for their selected site.
+
+- Extensions can capture checkout facts inside order placement, request restricted buyer fields, and add permission-aware links to an order.
+- Stored pricing includes the applied tax rate and inclusion setting for items, shipping and fees. New parcels record whether payment had settled at dispatch.
+- Applied amendments and late refund reversals emit after-commit events. Run `php please sellissimo:install` to add the new columns to an existing store.
+
 ## Initial release
 
 - Sell physical products, digital downloads and gift vouchers from a Statamic catalog. Buyers can use the bundled storefront or a custom Antlers checkout.

@@ -27,12 +27,18 @@ final class SettingsRegistry
     private array $actions = [];
 
     /** Field definitions use Statamic field configurations and Laravel validation rules. */
-    public function section(string $handle, string $title, string $description, string $permission, Closure $fields, ?Closure $validate = null, ?Closure $readiness = null): void
+    public function section(string $handle, string $title, string $description, string $permission, Closure $fields, ?Closure $validate = null, ?Closure $readiness = null, ?string $route = null): void
     {
         if (!preg_match('/^[a-z][a-z0-9_-]{0,69}$/D', $handle) || $handle === 'currency' || isset(self::SECTIONS[$handle]) || isset($this->extensions[$handle])) {
             throw new InvalidArgumentException("Invalid or duplicate settings section: $handle");
         }
-        $this->extensions[$handle] = compact('title', 'description', 'permission', 'fields', 'validate', 'readiness');
+        $this->extensions[$handle] = compact('title', 'description', 'permission', 'fields', 'validate', 'readiness', 'route');
+    }
+
+    public function destinationRoute(string $handle): ?string
+    {
+        $route = $this->extensions[$handle]['route'] ?? null;
+        return $route !== null && Route::has('statamic.cp.'.$route) ? $route : null;
     }
 
     public function action(string $section, string $title, string $route, string $permission, bool $shared = false, array $parameters = []): void
@@ -57,8 +63,8 @@ final class SettingsRegistry
             if (!Gate::any($permissions)) {
                 continue;
             }
-            $route = $handle === 'payments' ? 'sellissimo.settings.payments' : 'sellissimo.settings.section';
-            $params = $handle === 'payments' ? compact('site') : ['section' => $handle, 'site' => $site];
+            $route = $this->destinationRoute($handle) ?? ($handle === 'payments' ? 'sellissimo.settings.payments' : 'sellissimo.settings.section');
+            $params = $route === 'sellissimo.settings.section' ? ['section' => $handle, 'site' => $site] : compact('site');
             $visible[$handle] = ['handle' => $handle, 'title' => __($label), 'description' => __($description),
                 'group' => __($group), 'url' => cp_route($route, $params)];
         }

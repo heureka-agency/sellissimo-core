@@ -9,6 +9,8 @@ use Sellissimo\Core\Contracts\ShippingProvider;
 final class Registry
 {
     private array $providers = [];
+    private array $beforeReview = [];
+    private array $panelPermissions = [];
 
     public function shipping(string $handle, ShippingProvider $provider): void
     {
@@ -40,12 +42,55 @@ final class Registry
         $this->add('checkout_country_providers', $handle, $provider);
     }
 
-    public function checkoutStep(string $handle, Contracts\CheckoutStep $step): void
+    public function checkoutStep(string $handle, Contracts\CheckoutStep $step, bool $beforeReview = false): void
     {
         if (in_array($handle, ['contact', 'delivery', 'review'], true)) {
             throw new InvalidArgumentException("Reserved checkout step: $handle");
         }
         $this->add('checkout_steps', $handle, $step);
+        if ($beforeReview) {
+            $this->beforeReview[] = $handle;
+        }
+    }
+
+    public function beforeReviewSteps(): array
+    {
+        return $this->beforeReview;
+    }
+
+    public function billingFields(string $handle, callable $fields): void
+    {
+        $this->add('billing_fields', $handle, \Closure::fromCallable($fields));
+    }
+
+    public function requiredBillingFields(array $address, string $site, string $currency): array
+    {
+        $fields = [];
+        foreach ($this->installed('billing_fields') as $provider) {
+            $fields = array_merge($fields, $provider($address, $site, $currency));
+        }
+        return array_values(array_intersect(Http\CheckoutInput::ADDRESS_FIELDS, $fields));
+    }
+
+    public function orderPanel(string $handle, string $permission, callable $panel): void
+    {
+        $this->add('order_panels', $handle, \Closure::fromCallable($panel));
+        $this->panelPermissions[$handle] = $permission;
+    }
+
+    public function orderPanels(object $order, array $receipt, $staff): array
+    {
+        $panels = [];
+        foreach ($this->installed('order_panels') as $handle => $callback) {
+            if (!$staff?->can($this->panelPermissions[$handle])) {
+                continue;
+            }
+            $panel = $callback($order, $receipt, $staff);
+            if ($panel !== null) {
+                $panels[$handle] = ['title' => $panel['title'], 'label' => $panel['label'], 'url' => $panel['url']];
+            }
+        }
+        return $panels;
     }
 
     public function unitPrice(string $handle, Contracts\UnitPriceProvider $provider): void
@@ -126,6 +171,7 @@ final class Registry
 
     public function availablePayments(array $quote, string $site): array
     {
+        CheckoutSteps::takePrivateAnswers($quote);
         if (isset($quote['amount_due'])) {
             $quote['order_total'] = $quote['total'];
             $quote['total'] = $quote['amount_due'];
